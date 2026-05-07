@@ -1,8 +1,8 @@
-import { recordServiceInteraction } from "./request-log.service.js";
 import type { CatFactNinjaResponse } from "../../types/cat-of-day.types.js";
+import { HTTP_USER_AGENT } from "../wikimedia-http.js";
+import { recordServiceInteraction } from "./request-log.service.js";
 
 const CAT_FACT_NINJA = "https://catfact.ninja/fact";
-const USER_AGENT = "EvalHomework/1.0 (educational; contact student)";
 
 /**
  * Fetches one random cat-related fact from CatFact.ninja (suitable as a “quote” line under the image).
@@ -12,7 +12,7 @@ export async function fetchRandomCatFact(): Promise<string | null> {
   const logPayload = { outbound: "GET https://catfact.ninja/fact" };
   try {
     const res = await fetch(CAT_FACT_NINJA, {
-      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
+      headers: { Accept: "application/json", "User-Agent": HTTP_USER_AGENT },
     });
     if (!res.ok) {
       recordServiceInteraction(

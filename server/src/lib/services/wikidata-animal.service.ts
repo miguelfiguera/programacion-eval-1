@@ -1,7 +1,6 @@
 import { recordServiceInteraction } from "./request-log.service.js";
+import { fetchWithWikimediaRetry } from "../wikimedia-http.js";
 
-/** Match AnimalLookupService; Wikimedia prefers a descriptive User-Agent string. */
-const USER_AGENT = "EvalHomework/1.0 (educational; contact student)";
 const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
 /** Kingdom Animalia — https://www.wikidata.org/wiki/Q729 */
 const WIKIDATA_ANIMALIA = "Q729";
@@ -40,36 +39,6 @@ function claimItemIds(entity: WikidataEntity | undefined, property: string): str
   return out;
 }
 
-const FETCH_TIMEOUT_MS = 22_000;
-
-async function fetchJsonWithRetry(url: string, logPayload: Record<string, unknown>): Promise<Response | null> {
-  let wait = 500;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    });
-    if (res.status === 429 || res.status === 503) {
-      const raRaw = res.headers.get("retry-after");
-      const raSec = raRaw ? Number.parseInt(raRaw, 10) : Number.NaN;
-      const backoffMs =
-        Number.isFinite(raSec) && raSec > 0
-          ? Math.min(raSec * 1000, 12_000)
-          : Math.min(wait, 12_000);
-      recordServiceInteraction(
-        "WikidataAnimalService.retry",
-        { ...logPayload, attempt, status: res.status, backoffMs },
-        "Rate limited / busy; retrying"
-      );
-      await delay(backoffMs);
-      wait = Math.min(wait * 2, 15_000);
-      continue;
-    }
-    return res;
-  }
-  return null;
-}
-
 /**
  * Wikidata Q-id from a Wikipedia article title (follows redirects).
  */
@@ -82,7 +51,7 @@ export async function wikipediaTitleToWikidataId(
   const logPayload = { title, lang, outbound: url };
 
   try {
-    const res = await fetchJsonWithRetry(url, logPayload);
+    const res = await fetchWithWikimediaRetry(url, "WikidataAnimalService.http", logPayload);
     if (!res) {
       recordServiceInteraction("WikidataAnimalService.sitelink", logPayload, "Retries exhausted");
       return null;
@@ -123,7 +92,10 @@ async function wbGetEntitiesBatch(
   const batch = unique.slice(0, 50).join("|");
   const url = `${WIKIDATA_API}?action=wbgetentities&format=json&ids=${batch}&props=claims`;
 
-  const res = await fetchJsonWithRetry(url, { ...logPayload, batchSize: unique.length });
+  const res = await fetchWithWikimediaRetry(url, "WikidataAnimalService.http", {
+    ...logPayload,
+    batchSize: unique.length,
+  });
   if (!res) {
     recordServiceInteraction("WikidataAnimalService.wbgetentities", logPayload, "Retries exhausted");
     return null;

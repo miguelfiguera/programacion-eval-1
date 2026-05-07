@@ -7,8 +7,7 @@ import {
 import { fetchRandomCatImageUrl } from "./cat-api.service.js";
 import { recordServiceInteraction } from "./request-log.service.js";
 import { wikipediaArticleIsAnimalTaxon } from "./wikidata-animal.service.js";
-
-const USER_AGENT = "EvalHomework/1.0 (educational; contact student)";
+import { fetchWithWikimediaRetry } from "../wikimedia-http.js";
 
 const WIKI_ORIGINS = {
   en: "https://en.wikipedia.org",
@@ -202,9 +201,19 @@ async function wikipediaTitleCategorySignals(
   const logPayload = { title: title.trim(), lang, outbound: url };
 
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    });
+    const res = await fetchWithWikimediaRetry(
+      url,
+      "AnimalLookupService.wikipedia_categories",
+      logPayload
+    );
+    if (!res) {
+      recordServiceInteraction(
+        "AnimalLookupService.wikipedia_categories",
+        logPayload,
+        "MediaWiki retries exhausted"
+      );
+      return null;
+    }
     if (!res.ok) {
       recordServiceInteraction(
         "AnimalLookupService.wikipedia_categories",
@@ -258,9 +267,11 @@ async function wikipediaThumbnailUrl(
   const logTag = `AnimalLookupService.wikipedia.${lang}`;
 
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    });
+    const res = await fetchWithWikimediaRetry(url, logTag, logPayload);
+    if (!res) {
+      recordServiceInteraction(logTag, logPayload, "MediaWiki retries exhausted");
+      return { title: animalName.trim(), url: null };
+    }
     if (!res.ok) {
       recordServiceInteraction(logTag, logPayload, `Wikipedia HTTP ${res.status}`);
       return { title: animalName.trim(), url: null };
@@ -306,9 +317,11 @@ async function wikipediaOpenSearchTitles(
   const logTag = `AnimalLookupService.wikipedia_opensearch.${lang}`;
 
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    });
+    const res = await fetchWithWikimediaRetry(url, logTag, logPayload);
+    if (!res) {
+      recordServiceInteraction(logTag, logPayload, "MediaWiki retries exhausted");
+      return [];
+    }
     if (!res.ok) {
       recordServiceInteraction(logTag, logPayload, `Wikipedia OpenSearch HTTP ${res.status}`);
       return [];

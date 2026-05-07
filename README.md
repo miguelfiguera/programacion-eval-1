@@ -53,3 +53,5 @@ Capturas de pantalla del flujo en **docs/capturas/** (`docs/capturas/README.md`)
 | `SQLITE_PATH`     | `server/data/app.db`     | Ruta al archivo SQLite                                   |
 | `API_NINJAS_KEY`  | —                        | Opcional y recomendada: valida nombres de animales reales |
 | `CAT_API_KEY`     | —                        | Opcional: TheCatAPI; si falla, se usa Cataas como respaldo |
+
+Las peticiones HTTP salientes usan un `User-Agent` con contacto (`miguelqui725@gmail.com`) para APIs públicas (Wikimedia, etc.).

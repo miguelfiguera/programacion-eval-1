@@ -5,9 +5,9 @@ import type {
   MovieSummary,
 } from "../../types/movie.types.js";
 import { recordServiceInteraction } from "./request-log.service.js";
+import { HTTP_USER_AGENT } from "../wikimedia-http.js";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
-const USER_AGENT = "EvalHomework/1.0 (educational; contact student)";
 
 type TmdbDiscoverJson = {
   results?: Array<{
@@ -64,7 +64,7 @@ export async function discoverMovies(
   const url = discoverUrl(genre, country, bearer ? null : apiKey);
   const headers: Record<string, string> = {
     Accept: "application/json",
-    "User-Agent": USER_AGENT,
+    "User-Agent": HTTP_USER_AGENT,
   };
   if (bearer) {
     headers.Authorization = `Bearer ${bearer}`;

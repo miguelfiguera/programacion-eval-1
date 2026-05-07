@@ -1,6 +1,5 @@
+import { HTTP_USER_AGENT } from "../wikimedia-http.js";
 import { recordServiceInteraction } from "./request-log.service.js";
-
-const USER_AGENT = "EvalHomework/1.0 (educational; contact student)";
 
 const NINJAS_ANIMALS_URL = "https://api.api-ninjas.com/v1/animals";
 
@@ -48,7 +47,7 @@ export async function fetchNinjasAnimals(commonName: string): Promise<NinjasAnim
       headers: {
         "X-Api-Key": key,
         Accept: "application/json",
-        "User-Agent": USER_AGENT,
+        "User-Agent": HTTP_USER_AGENT,
       },
     });
 
