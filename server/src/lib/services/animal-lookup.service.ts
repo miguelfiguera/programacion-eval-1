@@ -6,6 +6,21 @@ const USER_AGENT = "EvalHomework/1.0 (educational; contact student)";
 const WIKI_API =
   "https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&piprop=thumbnail&pithumbsize=640&redirects=1&titles=";
 
+/**
+ * Folds user input for Wikipedia matching: trim, strip combining marks (accents),
+ * full lowercasing. Same logical term regardless of casing or diacritics.
+ */
+function foldAnimalQuery(raw: string): string {
+  return raw
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+}
+
+/** OpenSearch response shape: [searchTerm, titles[], descriptions[], urls[]]. */
+type WikiOpenSearchTuple = [string, string[], string[], string[]];
+
 type WikiQueryResponse = {
   query?: {
     pages?: Record<
@@ -77,6 +92,52 @@ async function wikipediaThumbnailUrl(
   }
 }
 
+/**
+ * Uses Wikipedia OpenSearch (enwiki) to resolve a fuzzy query to an article title.
+ */
+async function wikipediaOpenSearchFirstTitle(
+  foldedQuery: string
+): Promise<string | null> {
+  if (!foldedQuery) return null;
+  const url = `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&limit=5&namespace=0&search=${encodeURIComponent(foldedQuery)}`;
+  const logPayload = { foldedQuery, outbound: url };
+
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+    });
+    if (!res.ok) {
+      recordServiceInteraction(
+        "AnimalLookupService.wikipedia_opensearch",
+        logPayload,
+        `Wikipedia OpenSearch HTTP ${res.status}`
+      );
+      return null;
+    }
+    const data = (await res.json()) as WikiOpenSearchTuple;
+    const titles = data[1];
+    const first = titles?.[0]?.trim();
+    if (!first) {
+      recordServiceInteraction(
+        "AnimalLookupService.wikipedia_opensearch",
+        logPayload,
+        "OpenSearch returned no titles"
+      );
+      return null;
+    }
+    recordServiceInteraction("AnimalLookupService.wikipedia_opensearch", logPayload, null);
+    return first;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    recordServiceInteraction(
+      "AnimalLookupService.wikipedia_opensearch",
+      logPayload,
+      message
+    );
+    return null;
+  }
+}
+
 const FALLBACK_MESSAGE_ES =
   "Ups, no lo pudimos encontrar, pero aqui tienes un gatito.";
 
@@ -101,7 +162,30 @@ export async function lookupAnimalByName(name: string): Promise<AnimalLookupResu
     };
   }
 
-  const wiki = await wikipediaThumbnailUrl(trimmed);
+  const queryFolded = foldAnimalQuery(name);
+  if (!queryFolded) {
+    recordServiceInteraction(
+      "AnimalLookupService.lookup",
+      { name: trimmed, queryFolded },
+      "Animal name empty after accent/case fold"
+    );
+    const catUrl = (await fetchRandomCatImageUrl()) ?? "";
+    return {
+      displayName: trimmed,
+      imageUrl: catUrl,
+      usedFallback: true,
+      message: FALLBACK_MESSAGE_ES,
+    };
+  }
+
+  let wiki = await wikipediaThumbnailUrl(queryFolded);
+  if (!wiki.url) {
+    const osTitle = await wikipediaOpenSearchFirstTitle(queryFolded);
+    if (osTitle) {
+      wiki = await wikipediaThumbnailUrl(osTitle);
+    }
+  }
+
   if (wiki.url) {
     return {
       displayName: wiki.title,
@@ -114,7 +198,7 @@ export async function lookupAnimalByName(name: string): Promise<AnimalLookupResu
   const catUrl = await fetchRandomCatImageUrl();
   recordServiceInteraction(
     "AnimalLookupService.lookup",
-    { name: trimmed, source: "thecatapi_fallback" },
+    { name: trimmed, queryFolded, source: "thecatapi_fallback" },
     null
   );
   return {

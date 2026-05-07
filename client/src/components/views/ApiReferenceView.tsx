@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom'
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DocumentedEndpoint } from '@/lib/api/endpoints.docs'
 import type { RequestLogRowDto } from '@/lib/api/dto'
@@ -21,19 +19,7 @@ export function ApiReferenceView({
   onLogsReload,
 }: ApiReferenceViewProps) {
   return (
-    <div className="mx-auto flex min-h-svh max-w-4xl flex-col gap-8 bg-background px-4 py-10">
-      <div className="flex flex-wrap gap-3 text-sm">
-        <Link className="text-primary underline" to="/">
-          Tasks
-        </Link>
-        <Link className="text-primary underline" to="/exercise-2">
-          Ejercicio 2
-        </Link>
-        <Link className="text-primary underline" to="/animal-demo">
-          Animal demo
-        </Link>
-      </div>
-
+    <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-8">
       <Card>
         <CardHeader>
           <CardTitle>Catálogo de API (Node / Express)</CardTitle>

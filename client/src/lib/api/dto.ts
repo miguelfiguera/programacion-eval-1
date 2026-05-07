@@ -8,13 +8,9 @@ export type AnimalLookupResultDto = {
   message: string | null
 }
 
-export type TaskRowDto = {
-  id: number
-  title: string
-  done: number
-  created_at: string
-}
-
+/**
+ * Minimal movie card — mirrors server `MovieSummary`.
+ */
 export type MovieSummaryDto = {
   title: string
   overview: string
@@ -24,11 +20,6 @@ export type MovieSummaryDto = {
 
 export type MovieDiscoverResponseDto = {
   results: MovieSummaryDto[]
-}
-
-export type MovieTaxonomyResponseDto = {
-  genres: Array<{ id: number; label: string }>
-  countries: Array<{ code: string; label: string }>
 }
 
 export type RequestLogRowDto = {

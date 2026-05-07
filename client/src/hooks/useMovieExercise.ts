@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 
-import { fetchMovieDiscover, fetchMovieTaxonomy } from '@/lib/api/backend'
-import type {
-  MovieDiscoverResponseDto,
-  MovieTaxonomyResponseDto,
-} from '@/lib/api/dto'
+import { fetchMovieDiscover } from '@/lib/api/backend'
+import type { MovieDiscoverResponseDto } from '@/lib/api/dto'
 import {
   MovieCountryIso,
   MovieGenreTmdb,
@@ -13,13 +10,9 @@ import {
 } from '@/lib/types/movie.enums'
 
 /**
- * Loads taxonomy enum data from backend and runs discover with user-selected filters.
+ * Exercise 2: local enum listings + TMDB discover via backend.
  */
 export function useMovieExercise() {
-  const [taxonomy, setTaxonomy] = useState<MovieTaxonomyResponseDto | null>(null)
-  const [taxonomyError, setTaxonomyError] = useState<string | null>(null)
-  const [loadingTaxonomy, setLoadingTaxonomy] = useState(true)
-
   const [genre, setGenre] = useState<MovieGenreTmdb>(MovieGenreTmdb.Action)
   const [country, setCountry] = useState<MovieCountryIso>(
     MovieCountryIso.Spain,
@@ -29,43 +22,24 @@ export function useMovieExercise() {
   const [discoverLoading, setDiscoverLoading] = useState(false)
   const [discoverError, setDiscoverError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      setTaxonomyError(null)
-      setLoadingTaxonomy(true)
+  const discover = useCallback(
+    async (e?: FormEvent) => {
+      e?.preventDefault()
+      setDiscoverLoading(true)
+      setDiscoverError(null)
+      setMovies(null)
       try {
-        const data = await fetchMovieTaxonomy()
-        if (!cancelled) setTaxonomy(data)
-      } catch (e) {
-        if (!cancelled) {
-          setTaxonomyError(e instanceof Error ? e.message : String(e))
-        }
+        const payload = await fetchMovieDiscover(genre, country)
+        setMovies(payload)
+      } catch (err) {
+        setDiscoverError(err instanceof Error ? err.message : String(err))
       } finally {
-        if (!cancelled) setLoadingTaxonomy(false)
+        setDiscoverLoading(false)
       }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    },
+    [genre, country],
+  )
 
-  const discover = useCallback(async (e?: FormEvent) => {
-    e?.preventDefault()
-    setDiscoverLoading(true)
-    setDiscoverError(null)
-    setMovies(null)
-    try {
-      const payload = await fetchMovieDiscover(genre, country)
-      setMovies(payload)
-    } catch (err) {
-      setDiscoverError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setDiscoverLoading(false)
-    }
-  }, [genre, country])
-
-  /** Static enum listing for Exercise 2 (TypeScript definitions). */
   const enumGenreEntries = (
     Object.values(MovieGenreTmdb).filter(
       (v): v is MovieGenreTmdb => typeof v === 'number',
@@ -85,9 +59,6 @@ export function useMovieExercise() {
   }))
 
   return {
-    taxonomy,
-    taxonomyError,
-    loadingTaxonomy,
     enumGenreEntries,
     enumCountryEntries,
     genre,

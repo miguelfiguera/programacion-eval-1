@@ -1,0 +1,24 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+/** Landing page: exercises live under the top navbar (no demo CRUD). */
+export function HomeView() {
+  return (
+    <div className="flex flex-col items-center px-4 py-12">
+      <Card className="w-full max-w-md text-center shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">Inicio</CardTitle>
+          <CardDescription>
+            Elige un apartado en la barra superior: Animal favorito, Películas o la referencia de
+            API.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Toda la interfaz es React; el servidor en el puerto 3001 solo expone JSON bajo{' '}
+            <code className="rounded bg-muted px-1">/api</code>.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

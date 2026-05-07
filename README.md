@@ -1,6 +1,6 @@
 # programacion-eval-1
 
-Aplicacion fullstack de gestion de tareas (to-do list).
+Aplicacion fullstack Express + SQLite + React para ejercicios de programacion (API proxy + vistas en React).
 
 ## Stack
 
@@ -33,13 +33,13 @@ El build compila el cliente a `client/dist/` y el servidor a `server/dist/`. Exp
 
 ## API
 
-| Metodo   | Ruta             | Descripcion         |
-| -------- | ---------------- | ------------------- |
-| `GET`    | `/api/health`    | Health check        |
-| `GET`    | `/api/tasks`     | Listar tareas       |
-| `POST`   | `/api/tasks`     | Crear tarea         |
-| `PATCH`  | `/api/tasks/:id` | Marcar como hecha   |
-| `DELETE` | `/api/tasks/:id` | Eliminar tarea      |
+| Metodo | Ruta                     | Descripcion                                      |
+| ------ | ------------------------ | ------------------------------------------------ |
+| `GET`  | `/api/health`            | Health check                                     |
+| `GET`  | `/api/animals/lookup`    | Foto de animal (Wikipedia / TheCatAPI fallback)  |
+| `GET`  | `/api/cats/daily`        | Gato aleatorio + dato (TheCatAPI + CatFact)      |
+| `GET`  | `/api/movies/discover`   | Peliculas TMDB (genre + country)                 |
+| `GET`  | `/api/logs/recent`       | Ultimos logs de peticiones en SQLite             |
 
 ## Variables de entorno
 

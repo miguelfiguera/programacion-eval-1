@@ -1,20 +1,13 @@
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import type {
-  MovieDiscoverResponseDto,
-  MovieTaxonomyResponseDto,
-} from '@/lib/api/dto'
+import type { MovieDiscoverResponseDto } from '@/lib/api/dto'
 import type { MovieCountryIso, MovieGenreTmdb } from '@/lib/types/movie.enums'
 import { AlertCircle } from 'lucide-react'
 
 export type Exercise2ViewProps = {
-  loadingTaxonomy: boolean
-  taxonomyError: string | null
-  taxonomy: MovieTaxonomyResponseDto | null
   enumGenreEntries: Array<{ id: number; label: string }>
   enumCountryEntries: Array<{ code: string; label: string }>
   genre: MovieGenreTmdb
@@ -29,9 +22,6 @@ export type Exercise2ViewProps = {
 
 /** Shows TypeScript enums + TMDB-powered discover results (no hooks inside). */
 export function Exercise2View({
-  loadingTaxonomy,
-  taxonomyError,
-  taxonomy,
   enumGenreEntries,
   enumCountryEntries,
   genre,
@@ -44,22 +34,7 @@ export function Exercise2View({
   onDiscover,
 }: Exercise2ViewProps) {
   return (
-    <div className="mx-auto flex min-h-svh max-w-3xl flex-col gap-6 bg-background px-4 py-10">
-      <div className="flex flex-wrap gap-3 text-sm">
-        <Link className="text-primary underline" to="/">
-          Tasks
-        </Link>
-        <Link className="text-primary underline" to="/animal-demo">
-          Animal demo
-        </Link>
-        <Link className="text-primary underline" to="/api-docs">
-          API
-        </Link>
-        <a className="text-primary underline" href="/ex1/animal">
-          Ej.1 HTML
-        </a>
-      </div>
-
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
       <Card>
         <CardHeader>
           <CardTitle>Ejercicio 2 — Géneros y países (TypeScript)</CardTitle>
@@ -90,31 +65,6 @@ export function Exercise2View({
               ))}
             </ul>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Taxonomía desde Express</CardTitle>
-          <CardDescription>
-            GET <code className="rounded bg-muted px-1">/api/movies/taxonomy</code>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingTaxonomy && (
-            <p className="text-sm text-muted-foreground">Cargando taxonomía…</p>
-          )}
-          {taxonomyError && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertDescription>{taxonomyError}</AlertDescription>
-            </Alert>
-          )}
-          {taxonomy && (
-            <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-xs">
-              {JSON.stringify(taxonomy, null, 2)}
-            </pre>
-          )}
         </CardContent>
       </Card>
 

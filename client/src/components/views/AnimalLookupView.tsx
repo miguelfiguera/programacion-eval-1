@@ -1,5 +1,4 @@
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -21,7 +20,7 @@ export type AnimalLookupViewProps = {
   onGatoDelDia: () => void
 }
 
-/** Stateless layout for the Wikipedia + TheCatAPI demo page. */
+/** Stateless layout for Exercise 1: Wikipedia / TheCatAPI lookup + “Gato del día”. */
 export function AnimalLookupView({
   name,
   loading,
@@ -35,12 +34,12 @@ export function AnimalLookupView({
   onGatoDelDia,
 }: AnimalLookupViewProps) {
   return (
-    <div className="flex min-h-svh flex-col items-center bg-background px-4 py-10">
+    <div className="flex flex-col items-center px-4 py-8">
       <Card className="w-full max-w-lg shadow-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Animal demo (API)</CardTitle>
+          <CardTitle className="text-xl">Animal favorito</CardTitle>
           <CardDescription>
-            Backend consulta Wikipedia; si no hay imagen, usa{' '}
+            Busca un animal: el backend consulta Wikipedia y, si hace falta,{' '}
             <a
               className="text-primary underline"
               href="https://thecatapi.com/"
@@ -49,7 +48,7 @@ export function AnimalLookupView({
             >
               TheCatAPI
             </a>
-            . “Gato del día” añade un dato curioso desde{' '}
+            . “Gato del día” combina imagen (TheCatAPI) y un dato vía{' '}
             <a
               className="text-primary underline"
               href="https://catfact.ninja/"
@@ -62,16 +61,6 @@ export function AnimalLookupView({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <p className="text-sm text-muted-foreground">
-            <Link className="text-primary underline" to="/">
-              Tasks
-            </Link>
-            {' · '}
-            <a className="text-primary underline" href="/ex1/animal">
-              Ej.1 formulario HTML
-            </a>
-          </p>
-
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="size-4" />
