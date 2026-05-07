@@ -41,6 +41,15 @@ COPY --from=build /app/client/dist client/dist
 # Create data directory for SQLite
 RUN mkdir -p server/data
 
+# Optional build-time API keys (prefer `docker run --env-file .env` or Compose `env_file` so
+# secrets are not baked into layers when you omit --build-arg).
+ARG CAT_API_KEY=""
+ARG TMDB_API_KEY=""
+ARG TMDB_READ_ACCESS_TOKEN=""
+ENV CAT_API_KEY=${CAT_API_KEY}
+ENV TMDB_API_KEY=${TMDB_API_KEY}
+ENV TMDB_READ_ACCESS_TOKEN=${TMDB_READ_ACCESS_TOKEN}
+
 ENV PORT=3001
 EXPOSE 3001
 

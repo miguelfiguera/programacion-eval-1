@@ -1,0 +1,17 @@
+# Reads variables from `.env` in this directory for build args and runtime.
+# Example: `docker compose up --build`
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CAT_API_KEY: ${CAT_API_KEY:-}
+        TMDB_API_KEY: ${TMDB_API_KEY:-}
+        TMDB_READ_ACCESS_TOKEN: ${TMDB_READ_ACCESS_TOKEN:-}
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      PORT: "3001"

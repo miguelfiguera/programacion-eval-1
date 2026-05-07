@@ -1,155 +1,108 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import './App.css'
+import { type FormEvent } from 'react'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
-type Task = {
-  id: number
-  title: string
-  done: number | boolean
-  created_at: string
+import { ApiReferenceView } from '@/components/views/ApiReferenceView'
+import { AnimalLookupView } from '@/components/views/AnimalLookupView'
+import { Exercise2View } from '@/components/views/Exercise2View'
+import { TasksPageView } from '@/components/views/TasksPageView'
+import { documentedExpressEndpoints } from '@/lib/api/endpoints.docs'
+import { useAnimalLookup } from '@/hooks/useAnimalLookup'
+import { useCatOfDay } from '@/hooks/useCatOfDay'
+import { useMovieExercise } from '@/hooks/useMovieExercise'
+import { useRecentLogs } from '@/hooks/useRecentLogs'
+import { useTaskList } from '@/hooks/useTaskList'
+
+function TasksRoute() {
+  const t = useTaskList()
+  return (
+    <TasksPageView
+      tasks={t.tasks}
+      loading={t.loading}
+      error={t.error}
+      title={t.title}
+      submitting={t.submitting}
+      onTitleChange={t.setTitle}
+      onSubmit={t.handleAdd}
+      onToggleDone={t.toggleDone}
+      onRemove={t.removeTask}
+    />
+  )
 }
 
-async function parseError(res: Response): Promise<string> {
-  try {
-    const data = (await res.json()) as { error?: string }
-    return data.error ?? res.statusText
-  } catch {
-    return res.statusText
-  }
+function Exercise2Route() {
+  const m = useMovieExercise()
+  return (
+    <Exercise2View
+      loadingTaxonomy={m.loadingTaxonomy}
+      taxonomyError={m.taxonomyError}
+      taxonomy={m.taxonomy}
+      enumGenreEntries={m.enumGenreEntries}
+      enumCountryEntries={m.enumCountryEntries}
+      genre={m.genre}
+      country={m.country}
+      onGenreChange={m.setGenre}
+      onCountryChange={m.setCountry}
+      discoverLoading={m.discoverLoading}
+      discoverError={m.discoverError}
+      movies={m.movies}
+      onDiscover={m.discover}
+    />
+  )
 }
 
-export default function App() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [title, setTitle] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+function AnimalRoute() {
+  const a = useAnimalLookup()
+  const c = useCatOfDay()
 
-  const load = useCallback(async () => {
-    setError(null)
-    const res = await fetch('/api/tasks')
-    if (!res.ok) {
-      setError(await parseError(res))
-      setTasks([])
-      return
-    }
-    setTasks((await res.json()) as Task[])
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      setLoading(true)
-      await load()
-      if (!cancelled) setLoading(false)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [load])
-
-  async function handleAdd(e: FormEvent) {
-    e.preventDefault()
-    const t = title.trim()
-    if (!t || submitting) return
-    setSubmitting(true)
-    setError(null)
-    const res = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: t }),
-    })
-    setSubmitting(false)
-    if (!res.ok) {
-      setError(await parseError(res))
-      return
-    }
-    setTitle('')
-    await load()
+  const handleSearch = (e: FormEvent) => {
+    c.clear()
+    void a.search(e)
   }
 
-  async function toggleDone(task: Task) {
-    setError(null)
-    const res = await fetch(`/api/tasks/${task.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ done: !task.done }),
-    })
-    if (!res.ok) {
-      setError(await parseError(res))
-      return
-    }
-    await load()
-  }
-
-  async function removeTask(id: number) {
-    setError(null)
-    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
-    if (!res.ok && res.status !== 204) {
-      setError(await parseError(res))
-      return
-    }
-    await load()
+  const handleGatoDelDia = () => {
+    a.clear()
+    void c.load()
   }
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Tasks</h1>
-        <p className="subtitle">Express · SQLite · React · TypeScript</p>
-      </header>
+    <AnimalLookupView
+      name={a.name}
+      loading={a.loading}
+      error={a.error}
+      result={a.result}
+      onNameChange={a.setName}
+      onSearch={handleSearch}
+      gatoDelDia={c.data}
+      gatoDelDiaLoading={c.loading}
+      gatoDelDiaError={c.error}
+      onGatoDelDia={handleGatoDelDia}
+    />
+  )
+}
 
-      {error && (
-        <div className="banner error" role="alert">
-          {error}
-        </div>
-      )}
+function ApiDocsRoute() {
+  const logs = useRecentLogs(50)
+  return (
+    <ApiReferenceView
+      endpoints={documentedExpressEndpoints}
+      logs={logs.rows}
+      logsLoading={logs.loading}
+      logsError={logs.error}
+      onLogsReload={logs.reload}
+    />
+  )
+}
 
-      <form className="add-form" onSubmit={handleAdd}>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="New task…"
-          aria-label="Task title"
-          autoComplete="off"
-        />
-        <button type="submit" disabled={submitting || !title.trim()}>
-          Add
-        </button>
-      </form>
-
-      {loading ? (
-        <p className="muted">Loading…</p>
-      ) : tasks.length === 0 ? (
-        <p className="muted">No tasks yet. Add one above.</p>
-      ) : (
-        <ul className="task-list">
-          {tasks.map((task) => (
-            <li key={task.id} className={task.done ? 'task done' : 'task'}>
-              <label className="task-label">
-                <input
-                  type="checkbox"
-                  checked={Boolean(task.done)}
-                  onChange={() => {
-                    void toggleDone(task)
-                  }}
-                />
-                <span className="task-title">{task.title}</span>
-              </label>
-              <button
-                type="button"
-                className="delete"
-                onClick={() => {
-                  void removeTask(task.id)
-                }}
-                aria-label={`Delete ${task.title}`}
-              >
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+/** Application shell: routes only — behaviour lives in hooks + view components. */
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<TasksRoute />} />
+        <Route path="/exercise-2" element={<Exercise2Route />} />
+        <Route path="/animal-demo" element={<AnimalRoute />} />
+        <Route path="/api-docs" element={<ApiDocsRoute />} />
+      </Routes>
+    </BrowserRouter>
   )
 }

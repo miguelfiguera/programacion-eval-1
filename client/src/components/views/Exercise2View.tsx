@@ -1,0 +1,209 @@
+import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
+
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import type {
+  MovieDiscoverResponseDto,
+  MovieTaxonomyResponseDto,
+} from '@/lib/api/dto'
+import type { MovieCountryIso, MovieGenreTmdb } from '@/lib/types/movie.enums'
+import { AlertCircle } from 'lucide-react'
+
+export type Exercise2ViewProps = {
+  loadingTaxonomy: boolean
+  taxonomyError: string | null
+  taxonomy: MovieTaxonomyResponseDto | null
+  enumGenreEntries: Array<{ id: number; label: string }>
+  enumCountryEntries: Array<{ code: string; label: string }>
+  genre: MovieGenreTmdb
+  country: MovieCountryIso
+  onGenreChange: (g: MovieGenreTmdb) => void
+  onCountryChange: (c: MovieCountryIso) => void
+  discoverLoading: boolean
+  discoverError: string | null
+  movies: MovieDiscoverResponseDto | null
+  onDiscover: (e: FormEvent) => void
+}
+
+/** Shows TypeScript enums + TMDB-powered discover results (no hooks inside). */
+export function Exercise2View({
+  loadingTaxonomy,
+  taxonomyError,
+  taxonomy,
+  enumGenreEntries,
+  enumCountryEntries,
+  genre,
+  country,
+  onGenreChange,
+  onCountryChange,
+  discoverLoading,
+  discoverError,
+  movies,
+  onDiscover,
+}: Exercise2ViewProps) {
+  return (
+    <div className="mx-auto flex min-h-svh max-w-3xl flex-col gap-6 bg-background px-4 py-10">
+      <div className="flex flex-wrap gap-3 text-sm">
+        <Link className="text-primary underline" to="/">
+          Tasks
+        </Link>
+        <Link className="text-primary underline" to="/animal-demo">
+          Animal demo
+        </Link>
+        <Link className="text-primary underline" to="/api-docs">
+          API
+        </Link>
+        <a className="text-primary underline" href="/ex1/animal">
+          Ej.1 HTML
+        </a>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ejercicio 2 — Géneros y países (TypeScript)</CardTitle>
+          <CardDescription>
+            Enumeraciones en <code className="rounded bg-muted px-1">client/src/lib/types/movie.enums.ts</code> —
+            deben coincidir con el servidor para TMDB.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6 md:grid-cols-2">
+          <div>
+            <h3 className="mb-2 font-medium">MovieGenreTmdb</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {enumGenreEntries.map((g) => (
+                <li key={g.id}>
+                  <span className="font-mono text-foreground">{g.id}</span> — {g.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="mb-2 font-medium">MovieCountryIso</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {enumCountryEntries.map((c) => (
+                <li key={c.code}>
+                  <span className="font-mono text-foreground">{c.code}</span> —{' '}
+                  {c.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Taxonomía desde Express</CardTitle>
+          <CardDescription>
+            GET <code className="rounded bg-muted px-1">/api/movies/taxonomy</code>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingTaxonomy && (
+            <p className="text-sm text-muted-foreground">Cargando taxonomía…</p>
+          )}
+          {taxonomyError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{taxonomyError}</AlertDescription>
+            </Alert>
+          )}
+          {taxonomy && (
+            <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-xs">
+              {JSON.stringify(taxonomy, null, 2)}
+            </pre>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Descubrir películas (TMDB vía backend)</CardTitle>
+          <CardDescription>
+            Necesitas <code className="rounded bg-muted px-1">TMDB_API_KEY</code> en el servidor.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <form className="flex flex-wrap items-end gap-3" onSubmit={onDiscover}>
+            <label className="flex flex-col gap-1 text-sm">
+              Género
+              <select
+                className="h-8 rounded-lg border border-input bg-transparent px-2"
+                value={genre}
+                onChange={(e) =>
+                  onGenreChange(Number(e.target.value) as MovieGenreTmdb)
+                }
+              >
+                {enumGenreEntries.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              País
+              <select
+                className="h-8 rounded-lg border border-input bg-transparent px-2"
+                value={country}
+                onChange={(e) =>
+                  onCountryChange(e.target.value as MovieCountryIso)
+                }
+              >
+                {enumCountryEntries.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button type="submit" disabled={discoverLoading}>
+              {discoverLoading ? '…' : 'Buscar'}
+            </Button>
+          </form>
+
+          {discoverError && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{discoverError}</AlertDescription>
+            </Alert>
+          )}
+
+          {movies && movies.results.length === 0 && !discoverLoading && (
+            <p className="text-sm text-muted-foreground">
+              Sin resultados (¿falta TMDB_API_KEY o no hay coincidencias?).
+            </p>
+          )}
+
+          {movies && movies.results.length > 0 && (
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {movies.results.map((m, i) => (
+                <li
+                  key={`${m.title}-${m.releaseDate ?? 'nodate'}-${i}`}
+                  className="flex gap-3 rounded-lg border border-border p-3"
+                >
+                  {m.posterUrl && (
+                    <img
+                      src={m.posterUrl}
+                      alt=""
+                      className="h-28 w-20 shrink-0 rounded object-cover"
+                    />
+                  )}
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium">{m.title}</p>
+                    <p className="text-muted-foreground">{m.releaseDate}</p>
+                    <p className="mt-1 line-clamp-4 text-muted-foreground">
+                      {m.overview}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
