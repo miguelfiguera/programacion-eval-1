@@ -17,7 +17,7 @@ function HomeRoute() {
   return <HomeView />
 }
 
-/** Animal favorito: búsqueda + “Gato del día” (`?favorite=` opcional). */
+/** animal-favorito: búsqueda + “Gato del día” (`?favorite=` opcional). */
 function AnimalFavoritoRoute() {
   const [searchParams] = useSearchParams()
   const favoriteFromUrl = searchParams.get('favorite') ?? ''

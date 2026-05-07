@@ -20,6 +20,14 @@ app.use(express.json());
 
 app.use("/api", apiRouter);
 
+/** Legacy paths → canonical SPA route (address bar shows `/animal-favorito`). */
+function redirectExercise1ToAnimalFavorito(req: Request, res: Response) {
+  const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  res.redirect(301, `/animal-favorito${q}`);
+}
+app.get("/exercise-1", redirectExercise1ToAnimalFavorito);
+app.get("/exercise-1/result", redirectExercise1ToAnimalFavorito);
+
 const clientDist = path.join(__dirname, "..", "..", "client", "dist");
 app.use(express.static(clientDist));
 

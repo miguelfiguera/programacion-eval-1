@@ -10,7 +10,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
   )
 
-/** Top navigation between app sections (CRUD, exercises, API). */
+/** Top navigation between app sections (home, animal-favorito, movies, API). */
 export function AppNavbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -25,7 +25,7 @@ export function AppNavbar() {
           Inicio
         </NavLink>
         <NavLink to="/animal-favorito" className={navLinkClass}>
-          Animal favorito
+          animal-favorito
         </NavLink>
         <NavLink to="/exercise-2" className={navLinkClass}>
           Películas

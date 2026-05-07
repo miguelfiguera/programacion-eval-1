@@ -20,7 +20,7 @@ export type AnimalLookupViewProps = {
   onGatoDelDia: () => void
 }
 
-/** Stateless layout for Exercise 1: Wikipedia / TheCatAPI lookup + “Gato del día”. */
+/** Stateless layout for animal-favorito: Wikipedia / TheCatAPI lookup + “Gato del día”. */
 export function AnimalLookupView({
   name,
   loading,
@@ -37,7 +37,7 @@ export function AnimalLookupView({
     <div className="flex flex-col items-center px-4 py-8">
       <Card className="w-full max-w-lg shadow-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Animal favorito</CardTitle>
+          <CardTitle className="text-xl font-mono">animal-favorito</CardTitle>
           <CardDescription>
             Busca un animal: el backend consulta Wikipedia y, si hace falta,{' '}
             <a

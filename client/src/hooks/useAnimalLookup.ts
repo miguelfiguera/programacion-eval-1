@@ -9,7 +9,7 @@ export type UseAnimalLookupOptions = {
 }
 
 /**
- * Drives Exercise 1: animal name input + fetch via Express (Wikipedia / TheCatAPI).
+ * Animal-favorito page: animal name input + fetch via Express (Wikipedia / TheCatAPI).
  */
 export function useAnimalLookup(options?: UseAnimalLookupOptions) {
   const favoriteFromUrl = options?.favoriteFromUrl?.trim() ?? ''

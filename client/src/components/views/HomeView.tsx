@@ -8,8 +8,8 @@ export function HomeView() {
         <CardHeader>
           <CardTitle className="text-xl">Inicio</CardTitle>
           <CardDescription>
-            Elige un apartado en la barra superior: Animal favorito, Películas o la referencia de
-            API.
+            Elige un apartado en la barra superior: <span className="font-mono text-foreground">animal-favorito</span>, Películas o la
+            referencia de API.
           </CardDescription>
         </CardHeader>
         <CardContent>

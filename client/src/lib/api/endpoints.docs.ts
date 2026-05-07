@@ -24,9 +24,9 @@ export const documentedExpressEndpoints: DocumentedEndpoint[] = [
     method: 'GET',
     path: '/api/animals/lookup',
     description:
-      'Resolve an animal photo (Wikipedia thumbnail) with TheCatAPI fallback.',
+      'Resolve an animal photo: en/es Wikipedia, iNaturalist (Animalia only), TheCatAPI.',
     notes:
-      'Query `name`. Server normalizes Unicode (case-insensitive, diacritics stripped) and falls back to Wikipedia OpenSearch before TheCatAPI. Response: `{ displayName, imageUrl, usedFallback, message }`.',
+      'Query `name`. Normalizes Unicode; tries en/es Wikipedia (+ OpenSearch), then iNaturalist Animalia-only taxa (no key), then random cat. Response: `{ displayName, imageUrl, usedFallback, message }`.',
   },
   {
     method: 'GET',
