@@ -1,0 +1,11 @@
+node_modules
+dist
+server/dist
+client/dist
+server/data
+*.db
+.git
+.gitignore
+*.png
+*.md
+.claude
