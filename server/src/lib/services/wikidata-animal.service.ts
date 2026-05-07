@@ -157,6 +157,7 @@ function claimItemIds(entity: WikidataEntity | undefined, property: string): str
 
 /** P31 values that are never animals (astronomy, etc.) — skip before climbing Animalia. */
 const WIKIDATA_P31_BLOCKED_FOR_ANIMAL_LOOKUP = new Set<string>([
+  "Q756", // kingdom Plantae
   "Q8928", // constellation
   "Q1931185", // asterism
   "Q523", // star

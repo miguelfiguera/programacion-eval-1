@@ -123,24 +123,6 @@ function commonsThumbFromP18(filename: string, width: number): string {
   return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=${width}`;
 }
 
-function wikidataEntityHasTaxonSignals(entity: WikidataEntity | undefined): boolean {
-  return Boolean(
-    entity?.claims?.P105?.length ||
-      entity?.claims?.P225?.length ||
-      entity?.claims?.P171?.length
-  );
-}
-
-/** After climbing Animalia: accept true; reject false; if inconclusive (null), require taxon-like claims. */
-function wikidataAnimalCheckAcceptable(
-  animal: boolean | null,
-  entity: WikidataEntity | undefined
-): boolean {
-  if (animal === false) return false;
-  if (animal === true) return true;
-  return wikidataEntityHasTaxonSignals(entity);
-}
-
 function wikipediaTitleLooksAstronomyOrCosmology(title: string): boolean {
   const t = foldAnimalQuery(title.replace(/_/g, " "));
   return (
@@ -154,6 +136,13 @@ function wikipediaTitleLooksAstronomyOrCosmology(title: string): boolean {
     /\bzodiac\b/.test(t) ||
     (t.includes("iau") && /\b(constellation|asterism)\b/.test(t))
   );
+}
+
+/** Titles that denote plants/drugs and are often confused with animal colloquial names. */
+function wikipediaTitleExcludedAsNonAnimal(title: string): boolean {
+  const t = foldAnimalQuery(title.replace(/_/g, " ").replace(/\([^)]*\)/g, " ").trim());
+  const blocked = new Set(["khat", "catha edulis", "catha", "qat"]);
+  return blocked.has(t);
 }
 
 function wikipediaCategoryBlobLooksAstronomy(categoryTitles: string[]): boolean {
@@ -180,11 +169,11 @@ function pickSitelinkAvoidingAstronomy(
   entity: WikidataEntity
 ): { lang: WikiLang; title: string } | null {
   const en = wikidataSitelinkArticleTitle(entity, "enwiki");
-  if (en && !wikipediaTitleLooksAstronomyOrCosmology(en)) {
+  if (en && !wikipediaTitleLooksAstronomyOrCosmology(en) && !wikipediaTitleExcludedAsNonAnimal(en)) {
     return { lang: "en", title: en };
   }
   const es = wikidataSitelinkArticleTitle(entity, "eswiki");
-  if (es && !wikipediaTitleLooksAstronomyOrCosmology(es)) {
+  if (es && !wikipediaTitleLooksAstronomyOrCosmology(es) && !wikipediaTitleExcludedAsNonAnimal(es)) {
     return { lang: "es", title: es };
   }
   return null;
@@ -228,8 +217,8 @@ async function wikipediaLeadThumbnailUrl(lang: WikiLang, title: string): Promise
 }
 
 /**
- * Wikidata first: hinted English taxon labels → label search → block obvious sky objects (P31) →
- * Animalia climb → skip inconclusive hits unless the item looks like a taxon → P18 or Wikipedia thumb.
+ * Wikidata first: hinted English taxon labels → label search → block sky objects (P31) →
+ * Animalia climb must return **true** (plants, drugs, inconclusive → skip) → P18 or Wikipedia thumb.
  */
 async function findAnimalImageViaWikidataFirst(
   trimmed: string,
@@ -263,7 +252,7 @@ async function findAnimalImageViaWikidataFirst(
       WIKIDATA_ANIMAL_CHECK_BUDGET_MS,
       null
     );
-    if (!wikidataAnimalCheckAcceptable(animal, entity)) continue;
+    if (animal !== true) continue;
 
     const sitelink = pickSitelinkAvoidingAstronomy(entity);
     const wikipediaUrl =
@@ -288,7 +277,7 @@ async function findAnimalImageViaWikidataFirst(
         sitelink.lang === "en"
           ? wikidataSitelinkArticleTitle(entity, "eswiki")
           : wikidataSitelinkArticleTitle(entity, "enwiki");
-      if (altTitle && !wikipediaTitleLooksAstronomyOrCosmology(altTitle)) {
+      if (altTitle && !wikipediaTitleLooksAstronomyOrCosmology(altTitle) && !wikipediaTitleExcludedAsNonAnimal(altTitle)) {
         const altLang: WikiLang = sitelink.lang === "en" ? "es" : "en";
         const altThumb = await wikipediaLeadThumbnailUrl(altLang, altTitle);
         if (altThumb) {
@@ -351,6 +340,13 @@ function wikipediaCategoryBlobLooksNonAnimal(categoryTitles: string[]): boolean 
     /\brosales\b/,
     /\bcannabis\b/,
     /\bcrops?\b/,
+    /\bkhat\b/,
+    /\bcatha\b/,
+    /\bcathinone\b/,
+    /\balkaloids?\b/,
+    /\bstimulants?\b/,
+    /\bpsychoactive\b/,
+    /\bentheogens?\b/,
     /\btrees?\b/,
     /\bshrubs?\b/,
     /\bfruits?\b/,
@@ -560,13 +556,14 @@ async function findAnimalArticleOnWikipedia(
     if (wikipediaCategoryBlobLooksAstronomy(catTitles)) continue;
 
     const pageTitle = page.title?.trim() ?? resolved;
+    if (wikipediaTitleExcludedAsNonAnimal(pageTitle)) continue;
     if (wikipediaTitleLooksAstronomyOrCosmology(pageTitle)) continue;
     const wd = await withFallbackAfterMs(
       wikipediaArticleIsAnimalTaxon(pageTitle, lang),
       WIKIDATA_ANIMAL_CHECK_BUDGET_MS,
       null
     );
-    if (wd === false) continue;
+    if (wd !== true) continue;
 
     return {
       imageUrl: thumb,

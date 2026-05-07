@@ -10,6 +10,8 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 export type AnimalLookupViewProps = {
   name: string
   loading: boolean
+  /** Progreso aproximado mientras el backend trabaja (Wikidata → Animalia → imágenes). */
+  loadingPhaseLabel: string | null
   error: string | null
   result: AnimalLookupResultDto | null
   onNameChange: (v: string) => void
@@ -24,6 +26,7 @@ export type AnimalLookupViewProps = {
 export function AnimalLookupView({
   name,
   loading,
+  loadingPhaseLabel,
   error,
   result,
   onNameChange,
@@ -109,7 +112,13 @@ export function AnimalLookupView({
               aria-busy="true"
             >
               <Loader2 className="size-9 animate-spin text-primary" aria-hidden />
-              <span className="text-sm font-medium">Buscando…</span>
+              <span className="text-center text-sm font-medium leading-snug text-foreground">
+                {loadingPhaseLabel ?? 'Preparando búsqueda…'}
+              </span>
+              <span className="max-w-xs text-center text-xs text-muted-foreground">
+                El texto de cada paso es aproximado en el tiempo; el servidor solo devuelve un resultado
+                cuando Wikidata confirma Animalia (o el mismo criterio en el respaldo Wikipedia).
+              </span>
             </div>
           )}
 

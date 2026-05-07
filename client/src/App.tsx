@@ -39,6 +39,7 @@ function AnimalFavoritoRoute() {
     <AnimalLookupView
       name={a.name}
       loading={a.loading}
+      loadingPhaseLabel={a.loadingPhaseLabel}
       error={a.error}
       result={a.result}
       onNameChange={a.setName}
