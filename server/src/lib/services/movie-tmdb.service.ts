@@ -11,12 +11,59 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 
 type TmdbDiscoverJson = {
   results?: Array<{
+    id?: number;
     title?: string;
     overview?: string;
     poster_path?: string | null;
     release_date?: string | null;
   }>;
 };
+
+type TmdbCreditsJson = {
+  crew?: Array<{ job?: string; name?: string }>;
+};
+
+function tmdbAuthHeaders(): {
+  headers: Record<string, string>;
+  apiKey: string;
+  bearer: string;
+} {
+  const apiKey = process.env.TMDB_API_KEY ?? "";
+  const bearer = process.env.TMDB_READ_ACCESS_TOKEN ?? "";
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "User-Agent": HTTP_USER_AGENT,
+  };
+  if (bearer) {
+    headers.Authorization = `Bearer ${bearer}`;
+  }
+  return { headers, apiKey, bearer };
+}
+
+async function fetchMovieDirector(
+  movieId: number,
+  apiKey: string,
+  bearer: string,
+  baseHeaders: Record<string, string>
+): Promise<string | null> {
+  const params = new URLSearchParams();
+  if (!bearer && apiKey) {
+    params.set("api_key", apiKey);
+  }
+  const qs = params.toString();
+  const url = `${TMDB_BASE}/movie/${movieId}/credits${qs ? `?${qs}` : ""}`;
+
+  try {
+    const res = await fetch(url, { headers: baseHeaders });
+    if (!res.ok) return null;
+    const data = (await res.json()) as TmdbCreditsJson;
+    const d = data.crew?.find((c) => c.job === "Director");
+    const name = d?.name?.trim();
+    return name || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Builds discover URL. Uses `api_key` in the query only when no Bearer token is configured.
@@ -62,13 +109,7 @@ export async function discoverMovies(
   }
 
   const url = discoverUrl(genre, country, bearer ? null : apiKey);
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    "User-Agent": HTTP_USER_AGENT,
-  };
-  if (bearer) {
-    headers.Authorization = `Bearer ${bearer}`;
-  }
+  const { headers } = tmdbAuthHeaders();
 
   try {
     const res = await fetch(url, { headers });
@@ -85,14 +126,24 @@ export async function discoverMovies(
     const data = (await res.json()) as TmdbDiscoverJson;
     const raw = Array.isArray(data.results) ? data.results : [];
 
-    const results: MovieSummary[] = raw.map((r) => ({
-      title: r.title ?? "(sin título)",
-      overview: r.overview ?? "",
-      posterUrl: r.poster_path
-        ? `https://image.tmdb.org/t/p/w200${r.poster_path}`
-        : null,
-      releaseDate: r.release_date ?? null,
-    }));
+    const { apiKey: key, bearer: token, headers: h } = tmdbAuthHeaders();
+
+    const results: MovieSummary[] = await Promise.all(
+      raw.map(async (r) => {
+        const id = typeof r.id === "number" && r.id > 0 ? r.id : 0;
+        const director = id > 0 ? await fetchMovieDirector(id, key, token, h) : null;
+        return {
+          id,
+          title: r.title ?? "(sin título)",
+          overview: r.overview ?? "",
+          posterUrl: r.poster_path
+            ? `https://image.tmdb.org/t/p/w200${r.poster_path}`
+            : null,
+          releaseDate: r.release_date ?? null,
+          director,
+        };
+      })
+    );
 
     recordServiceInteraction(
       "MovieTmdbService.discover",

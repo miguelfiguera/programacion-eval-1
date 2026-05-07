@@ -40,7 +40,7 @@ Capturas de pantalla del flujo en **docs/capturas/** (`docs/capturas/README.md`)
 | Metodo | Ruta                     | Descripcion                                                         |
 | ------ | ------------------------ | ------------------------------------------------------------------- |
 | `GET`  | `/api/health`            | Health check                                                        |
-| `GET`  | `/api/animals/lookup`    | Foto de animal (API Ninjas si hay clave, Wikipedia en/es, gato) |
+| `GET`  | `/api/animals/lookup`    | Foto de animal (Wikidata Animalia + P18/Commons, Wikipedia de respaldo, gato) |
 | `GET`  | `/api/cats/daily`        | Gato aleatorio + dato (TheCatAPI + CatFact)      |
 | `GET`  | `/api/movies/discover`   | Peliculas TMDB (genre + country)                 |
 | `GET`  | `/api/logs/recent`       | Ultimos logs de peticiones en SQLite             |
@@ -51,7 +51,6 @@ Capturas de pantalla del flujo en **docs/capturas/** (`docs/capturas/README.md`)
 | ----------------- | ------------------------ | -------------------------------------------------------- |
 | `PORT`            | `3001`                   | Puerto del servidor                                      |
 | `SQLITE_PATH`     | `server/data/app.db`     | Ruta al archivo SQLite                                   |
-| `API_NINJAS_KEY`  | —                        | Opcional y recomendada: valida nombres de animales reales |
 | `CAT_API_KEY`     | —                        | Opcional: TheCatAPI; si falla, se usa Cataas como respaldo |
 
 Las peticiones HTTP salientes usan un `User-Agent` con contacto (`miguelqui725@gmail.com`) para APIs públicas (Wikimedia, etc.).

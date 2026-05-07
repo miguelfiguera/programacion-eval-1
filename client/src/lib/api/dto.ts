@@ -6,16 +6,20 @@ export type AnimalLookupResultDto = {
   imageUrl: string
   usedFallback: boolean
   message: string | null
+  /** Present when the image is from Wikipedia (en or es). */
+  wikipediaUrl: string | null
 }
 
 /**
  * Minimal movie card — mirrors server `MovieSummary`.
  */
 export type MovieSummaryDto = {
+  id: number
   title: string
   overview: string
   posterUrl: string | null
   releaseDate: string | null
+  director: string | null
 }
 
 export type MovieDiscoverResponseDto = {

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import type { AnimalLookupResultDto, CatOfDayDto } from '@/lib/api/dto'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 
 export type AnimalLookupViewProps = {
   name: string
@@ -102,7 +102,15 @@ export function AnimalLookupView({
           </form>
 
           {loading && (
-            <p className="text-sm text-muted-foreground">Consultando…</p>
+            <div
+              className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 py-10 text-muted-foreground"
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <Loader2 className="size-9 animate-spin text-primary" aria-hidden />
+              <span className="text-sm font-medium">Buscando…</span>
+            </div>
           )}
 
           {result && (
@@ -122,6 +130,20 @@ export function AnimalLookupView({
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">Sin imagen.</p>
+              )}
+              {result.wikipediaUrl && (
+                <p className="text-sm">
+                  <a
+                    href={result.wikipediaUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline"
+                  >
+                    {result.wikipediaUrl.includes("wikidata.org")
+                      ? "Ver entrada en Wikidata"
+                      : "Ver artículo en Wikipedia"}
+                  </a>
+                </p>
               )}
             </div>
           )}

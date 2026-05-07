@@ -12,15 +12,131 @@ const WIKI_ORIGINS_FOR_WIKIDATA = {
 
 export type WikiLangForWikidata = keyof typeof WIKI_ORIGINS_FOR_WIKIDATA;
 
-type WikidataEntity = {
+export type WikidataEntity = {
   missing?: string;
   claims?: Record<string, Array<{ mainsnak?: { datavalue?: { value?: unknown } } }>>;
+  sitelinks?: Record<string, { title?: string }>;
 };
 
 type WbGetEntitiesResponse = {
   entities?: Record<string, WikidataEntity>;
   error?: { info?: string };
 };
+
+function claimStringValue(entity: WikidataEntity | undefined, property: string): string | null {
+  const claims = entity?.claims?.[property];
+  const v = claims?.[0]?.mainsnak?.datavalue?.value;
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return null;
+}
+
+/**
+ * Commons image filename from Wikidata P18 (if present).
+ */
+export function wikidataP18Filename(entity: WikidataEntity | undefined): string | null {
+  return claimStringValue(entity, "P18");
+}
+
+/**
+ * Article title (with spaces) for a Wikipedia sister project sitelink.
+ */
+export function wikidataSitelinkArticleTitle(
+  entity: WikidataEntity | undefined,
+  site: "enwiki" | "eswiki"
+): string | null {
+  const t = entity?.sitelinks?.[site]?.title?.trim();
+  return t ?? null;
+}
+
+/**
+ * `wbsearchentities` — ordered Q-id hits for a label / alias search.
+ */
+export async function wikidataSearchEntityIds(
+  search: string,
+  language: string,
+  limit: number
+): Promise<string[]> {
+  const q = search.trim();
+  if (!q) return [];
+
+  const url =
+    `${WIKIDATA_API}?action=wbsearchentities&format=json` +
+    `&language=${encodeURIComponent(language)}&uselang=${encodeURIComponent(language)}` +
+    `&type=item&limit=${Math.min(Math.max(limit, 1), 20)}&search=${encodeURIComponent(q)}`;
+  const logPayload = { search: q, language, outbound: url };
+
+  try {
+    const res = await fetchWithWikimediaRetry(url, "WikidataAnimalService.wbsearchentities", logPayload);
+    if (!res || !res.ok) {
+      recordServiceInteraction(
+        "WikidataAnimalService.wbsearchentities",
+        logPayload,
+        res ? `HTTP ${res.status}` : "Retries exhausted"
+      );
+      return [];
+    }
+    const data = (await res.json()) as { search?: Array<{ id?: string }> };
+    const rows = data.search ?? [];
+    const ids = rows.map((r) => r.id).filter((id): id is string => Boolean(id?.startsWith("Q")));
+    recordServiceInteraction(
+      "WikidataAnimalService.wbsearchentities",
+      logPayload,
+      ids.length === 0 ? "No hits" : null
+    );
+    return ids;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    recordServiceInteraction("WikidataAnimalService.wbsearchentities", logPayload, message);
+    return [];
+  }
+}
+
+/**
+ * Batch fetch claims + sitelinks (partial OK: skips missing ids in the result map).
+ */
+export async function wikidataGetEntitiesClaimsAndSitelinks(
+  ids: string[]
+): Promise<Record<string, WikidataEntity> | null> {
+  const unique = [...new Set(ids.filter((id) => id?.startsWith("Q")))].slice(0, 50);
+  if (unique.length === 0) return {};
+
+  const batch = unique.join("|");
+  const url = `${WIKIDATA_API}?action=wbgetentities&format=json&ids=${batch}&props=claims|sitelinks`;
+  const logPayload = { batchSize: unique.length, outbound: url };
+
+  const res = await fetchWithWikimediaRetry(url, "WikidataAnimalService.http", logPayload);
+  if (!res) {
+    recordServiceInteraction("WikidataAnimalService.wbgetentities_sitelinks", logPayload, "Retries exhausted");
+    return null;
+  }
+  if (!res.ok) {
+    recordServiceInteraction(
+      "WikidataAnimalService.wbgetentities_sitelinks",
+      logPayload,
+      `HTTP ${res.status}`
+    );
+    return null;
+  }
+  const data = (await res.json()) as WbGetEntitiesResponse;
+  if (data.error) {
+    recordServiceInteraction(
+      "WikidataAnimalService.wbgetentities_sitelinks",
+      logPayload,
+      data.error.info ?? "Wikidata error"
+    );
+    return null;
+  }
+
+  const entities = data.entities ?? {};
+  const out: Record<string, WikidataEntity> = {};
+  for (const qid of unique) {
+    const e = entities[qid];
+    if (e && e.missing === undefined) out[qid] = e;
+  }
+  await delay(80);
+  recordServiceInteraction("WikidataAnimalService.wbgetentities_sitelinks", logPayload, null);
+  return out;
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -37,6 +153,29 @@ function claimItemIds(entity: WikidataEntity | undefined, property: string): str
     }
   }
   return out;
+}
+
+/** P31 values that are never animals (astronomy, etc.) — skip before climbing Animalia. */
+const WIKIDATA_P31_BLOCKED_FOR_ANIMAL_LOOKUP = new Set<string>([
+  "Q8928", // constellation
+  "Q1931185", // asterism
+  "Q523", // star
+  "Q6243", // galaxy
+  "Q7197", // natural satellite
+  "Q193384", // natural satellite
+  "Q1457686", // galaxy filament
+  "Q7179878", // meteor shower
+  "Q696625", // planetary nebula
+]);
+
+/**
+ * True when instance-of (P31) is clearly non-biological astronomy / sky object.
+ */
+export function wikidataEntityP31BlockedForAnimalLookup(
+  entity: WikidataEntity | undefined
+): boolean {
+  const p31 = claimItemIds(entity, "P31");
+  return p31.some((id) => WIKIDATA_P31_BLOCKED_FOR_ANIMAL_LOOKUP.has(id));
 }
 
 /**

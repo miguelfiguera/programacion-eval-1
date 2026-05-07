@@ -13,6 +13,8 @@ export type AnimalLookupResult = {
    * Null when the primary lookup succeeded.
    */
   message: string | null;
+  /** Article URL when `imageUrl` came from Wikipedia; otherwise null. */
+  wikipediaUrl: string | null;
 };
 
 /**

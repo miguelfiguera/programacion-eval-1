@@ -1,12 +1,16 @@
 import type { AnimalLookupResult } from "../../types/animal.types.js";
-import {
-  fetchNinjasAnimals,
-  ninjaWikiLookupSeed,
-  pickNinjaAnimalRecord,
-} from "./animals-ninjas.service.js";
 import { fetchRandomCatImageUrl } from "./cat-api.service.js";
 import { recordServiceInteraction } from "./request-log.service.js";
-import { wikipediaArticleIsAnimalTaxon } from "./wikidata-animal.service.js";
+import {
+  type WikidataEntity,
+  wikidataEntityP31BlockedForAnimalLookup,
+  wikipediaArticleIsAnimalTaxon,
+  wikidataGetEntitiesClaimsAndSitelinks,
+  wikidataItemIsUnderAnimalia,
+  wikidataP18Filename,
+  wikidataSearchEntityIds,
+  wikidataSitelinkArticleTitle,
+} from "./wikidata-animal.service.js";
 import { fetchWithWikimediaRetry } from "../wikimedia-http.js";
 
 const WIKI_ORIGINS = {
@@ -64,6 +68,7 @@ const WIKI_TITLE_AHEAD_HINTS: Record<string, string[]> = {
   perro: ["Dog"],
   oso: ["Bear"],
   lobo: ["Wolf"],
+  lupus: ["Wolf"],
   zorra: ["Fox"],
   zorro: ["Fox"],
   elefante: ["Elephant"],
@@ -99,40 +104,236 @@ function dedupeTitlesByFold(titles: string[]): string[] {
   return out;
 }
 
-type WikiQueryResponse = {
-  query?: {
-    pages?: Record<
-      string,
-      {
-        pageid?: number;
-        title?: string;
-        missing?: string;
-        thumbnail?: { source?: string };
+const WIKIDATA_SEARCH_PER_LANG = 14;
+const WIKIDATA_MAX_QIDS = 22;
+
+/** Deduplicate Q-ids; first occurrence (e.g. Spanish hits before English) wins. */
+function dedupeQids(ids: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!id?.startsWith("Q") || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+function commonsThumbFromP18(filename: string, width: number): string {
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=${width}`;
+}
+
+function wikidataEntityHasTaxonSignals(entity: WikidataEntity | undefined): boolean {
+  return Boolean(
+    entity?.claims?.P105?.length ||
+      entity?.claims?.P225?.length ||
+      entity?.claims?.P171?.length
+  );
+}
+
+/** After climbing Animalia: accept true; reject false; if inconclusive (null), require taxon-like claims. */
+function wikidataAnimalCheckAcceptable(
+  animal: boolean | null,
+  entity: WikidataEntity | undefined
+): boolean {
+  if (animal === false) return false;
+  if (animal === true) return true;
+  return wikidataEntityHasTaxonSignals(entity);
+}
+
+function wikipediaTitleLooksAstronomyOrCosmology(title: string): boolean {
+  const t = foldAnimalQuery(title.replace(/_/g, " "));
+  return (
+    /\(constellation\)/.test(t) ||
+    /\(asterism\)/.test(t) ||
+    /\bconstellation\b/.test(t) ||
+    /\bconstelacion\b/.test(t) ||
+    /\basterism\b/.test(t) ||
+    /\basterismo\b/.test(t) ||
+    /\bmessier\b/.test(t) ||
+    /\bzodiac\b/.test(t) ||
+    (t.includes("iau") && /\b(constellation|asterism)\b/.test(t))
+  );
+}
+
+function wikipediaCategoryBlobLooksAstronomy(categoryTitles: string[]): boolean {
+  const blob = categoryTitles.join(" | ").toLowerCase();
+  return [
+    /\bconstellations?\b/,
+    /\bconstelaciones?\b/,
+    /\basterisms?\b/,
+    /\b(open|globular)\s+clusters?\b/,
+    /\bgalaxies\b/,
+    /\bgalaxias\b/,
+    /\bdwarf\s+planets?\b/,
+    /\bplanetary\s+nebulae\b/,
+    /\bnebulosae?\b/,
+    /\bnebrosas?\b/,
+    /\bdee?p[\s-]sky\b/,
+    /\bastro?nom(y|ia|ical|i[ck]e)\b/,
+    /\bcelestial\b/,
+    /\bmessier\s+objects?\b/,
+  ].some((p) => p.test(blob));
+}
+
+function pickSitelinkAvoidingAstronomy(
+  entity: WikidataEntity
+): { lang: WikiLang; title: string } | null {
+  const en = wikidataSitelinkArticleTitle(entity, "enwiki");
+  if (en && !wikipediaTitleLooksAstronomyOrCosmology(en)) {
+    return { lang: "en", title: en };
+  }
+  const es = wikidataSitelinkArticleTitle(entity, "eswiki");
+  if (es && !wikipediaTitleLooksAstronomyOrCosmology(es)) {
+    return { lang: "es", title: es };
+  }
+  return null;
+}
+
+/**
+ * Lead thumbnail for one article title (after OpenSearch / Wikidata sitelink).
+ */
+async function wikipediaLeadThumbnailUrl(lang: WikiLang, title: string): Promise<string | null> {
+  const enc = encodeURIComponent(title.trim());
+  const url = `${WIKI_ORIGINS[lang]}/w/api.php?action=query&format=json&prop=pageimages&piprop=thumbnail&pithumbsize=640&redirects=1&titles=${enc}`;
+  const logPayload = { title: title.trim(), lang, outbound: url };
+  const logTag = `AnimalLookupService.wikipedia_thumb.${lang}`;
+
+  try {
+    const res = await fetchWithWikimediaRetry(url, logTag, logPayload);
+    if (!res) {
+      recordServiceInteraction(logTag, logPayload, "MediaWiki retries exhausted");
+      return null;
+    }
+    if (!res.ok) {
+      recordServiceInteraction(logTag, logPayload, `HTTP ${res.status}`);
+      return null;
+    }
+    const data = (await res.json()) as {
+      query?: { pages?: Record<string, { missing?: string; thumbnail?: { source?: string } }> };
+    };
+    const pages = data.query?.pages;
+    const first = pages ? Object.values(pages)[0] : undefined;
+    if (!first?.thumbnail?.source || first.missing !== undefined) {
+      recordServiceInteraction(logTag, logPayload, "No thumbnail");
+      return null;
+    }
+    recordServiceInteraction(logTag, logPayload, null);
+    return first.thumbnail.source;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    recordServiceInteraction(logTag, logPayload, message);
+    return null;
+  }
+}
+
+/**
+ * Wikidata first: hinted English taxon labels → label search → block obvious sky objects (P31) →
+ * Animalia climb → skip inconclusive hits unless the item looks like a taxon → P18 or Wikipedia thumb.
+ */
+async function findAnimalImageViaWikidataFirst(
+  trimmed: string,
+  queryFolded: string
+): Promise<{ imageUrl: string; wikipediaUrl: string } | null> {
+  const hints = WIKI_TITLE_AHEAD_HINTS[queryFolded] ?? [];
+  const hintIdLists = await Promise.all(
+    hints.map((h) => wikidataSearchEntityIds(h, "en", 8))
+  );
+  const hintIds = hintIdLists.flat();
+
+  const [idsEs, idsEn] = await Promise.all([
+    wikidataSearchEntityIds(trimmed, "es", WIKIDATA_SEARCH_PER_LANG),
+    wikidataSearchEntityIds(trimmed, "en", WIKIDATA_SEARCH_PER_LANG),
+  ]);
+
+  const orderedIds = dedupeQids([...hintIds, ...idsEs, ...idsEn]).slice(0, WIKIDATA_MAX_QIDS);
+  if (orderedIds.length === 0) return null;
+
+  const entityMap = await wikidataGetEntitiesClaimsAndSitelinks(orderedIds);
+  if (!entityMap) return null;
+
+  for (const qid of orderedIds) {
+    const entity = entityMap[qid];
+    if (!entity) continue;
+
+    if (wikidataEntityP31BlockedForAnimalLookup(entity)) continue;
+
+    const animal = await withFallbackAfterMs(
+      wikidataItemIsUnderAnimalia(qid),
+      WIKIDATA_ANIMAL_CHECK_BUDGET_MS,
+      null
+    );
+    if (!wikidataAnimalCheckAcceptable(animal, entity)) continue;
+
+    const sitelink = pickSitelinkAvoidingAstronomy(entity);
+    const wikipediaUrl =
+      sitelink != null
+        ? wikipediaArticleUrl(sitelink.lang, sitelink.title)
+        : `https://www.wikidata.org/wiki/${encodeURIComponent(qid)}`;
+
+    const p18 = wikidataP18Filename(entity);
+    if (p18) {
+      return {
+        imageUrl: commonsThumbFromP18(p18, 640),
+        wikipediaUrl,
+      };
+    }
+
+    if (sitelink) {
+      const thumb = await wikipediaLeadThumbnailUrl(sitelink.lang, sitelink.title);
+      if (thumb) {
+        return { imageUrl: thumb, wikipediaUrl };
       }
-    >;
+      const altTitle =
+        sitelink.lang === "en"
+          ? wikidataSitelinkArticleTitle(entity, "eswiki")
+          : wikidataSitelinkArticleTitle(entity, "enwiki");
+      if (altTitle && !wikipediaTitleLooksAstronomyOrCosmology(altTitle)) {
+        const altLang: WikiLang = sitelink.lang === "en" ? "es" : "en";
+        const altThumb = await wikipediaLeadThumbnailUrl(altLang, altTitle);
+        if (altThumb) {
+          return { imageUrl: altThumb, wikipediaUrl: wikipediaArticleUrl(altLang, altTitle) };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+type WikiBatchPage = {
+  pageid?: number;
+  title?: string;
+  missing?: string;
+  categories?: Array<{ title: string }>;
+  thumbnail?: { source?: string };
+};
+
+type WikiBatchResponse = {
+  query?: {
+    normalized?: Array<{ from: string; to: string }>;
+    redirects?: Array<{ from: string; to: string }>;
+    pages?: Record<string, WikiBatchPage>;
   };
 };
 
-function wikiPageImagesUrl(lang: WikiLang, title: string): string {
-  const enc = encodeURIComponent(title.trim());
-  return `${WIKI_ORIGINS[lang]}/w/api.php?action=query&format=json&prop=pageimages&piprop=thumbnail&pithumbsize=640&redirects=1&titles=${enc}`;
+function wikipediaArticleUrl(lang: WikiLang, title: string): string {
+  const seg = title.trim().replace(/ /g, "_");
+  return `${WIKI_ORIGINS[lang]}/wiki/${encodeURIComponent(seg)}`;
+}
+
+function wikiBatchCategoriesPageImagesUrl(lang: WikiLang, titles: string[]): string {
+  const enc = titles.map((t) => encodeURIComponent(t.trim())).join("|");
+  return (
+    `${WIKI_ORIGINS[lang]}/w/api.php?action=query&format=json&redirects=1` +
+    `&prop=categories|pageimages&cllimit=50&clshow=!hidden` +
+    `&piprop=thumbnail&pithumbsize=640&titles=${enc}`
+  );
 }
 
 function wikiOpenSearchUrl(lang: WikiLang, query: string, limit: number): string {
   return `${WIKI_ORIGINS[lang]}/w/api.php?action=opensearch&format=json&limit=${limit}&namespace=0&search=${encodeURIComponent(query)}`;
 }
-
-type WikiCategoriesResponse = {
-  query?: {
-    pages?: Record<
-      string,
-      {
-        title?: string;
-        categories?: Array<{ title: string }>;
-      }
-    >;
-  };
-};
 
 /** Heuristic: category titles suggest plant / fungus / non-target topic. */
 function wikipediaCategoryBlobLooksNonAnimal(categoryTitles: string[]): boolean {
@@ -189,120 +390,86 @@ function wikipediaCategoryBlobLooksPersonArticle(categoryTitles: string[]): bool
   return patterns.some((p) => p.test(blob));
 }
 
-/**
- * One categories fetch for heuristics. `null` means the API failed — do not reject the title on that alone.
- */
-async function wikipediaTitleCategorySignals(
-  title: string,
-  lang: WikiLang
-): Promise<{ plantLike: boolean; personLike: boolean } | null> {
-  const enc = encodeURIComponent(title.trim());
-  const url = `${WIKI_ORIGINS[lang]}/w/api.php?action=query&format=json&prop=categories&cllimit=50&clshow=!hidden&titles=${enc}`;
-  const logPayload = { title: title.trim(), lang, outbound: url };
-
-  try {
-    const res = await fetchWithWikimediaRetry(
-      url,
-      "AnimalLookupService.wikipedia_categories",
-      logPayload
-    );
-    if (!res) {
-      recordServiceInteraction(
-        "AnimalLookupService.wikipedia_categories",
-        logPayload,
-        "MediaWiki retries exhausted"
-      );
-      return null;
-    }
-    if (!res.ok) {
-      recordServiceInteraction(
-        "AnimalLookupService.wikipedia_categories",
-        logPayload,
-        `HTTP ${res.status}`
-      );
-      return null;
-    }
-
-    const data = (await res.json()) as WikiCategoriesResponse;
-    const pages = data.query?.pages;
-    if (!pages) {
-      recordServiceInteraction("AnimalLookupService.wikipedia_categories", logPayload, "No pages");
-      return null;
-    }
-
-    const first = Object.values(pages)[0];
-    const cats = first?.categories?.map((c) => c.title) ?? [];
-    if (cats.length === 0) {
-      recordServiceInteraction(
-        "AnimalLookupService.wikipedia_categories",
-        logPayload,
-        "No categories"
-      );
-      return { plantLike: false, personLike: false };
-    }
-
-    const plantLike = wikipediaCategoryBlobLooksNonAnimal(cats);
-    const personLike = wikipediaCategoryBlobLooksPersonArticle(cats);
-    let note: string | null = null;
-    if (plantLike) note = "Categories look plant/fungus/non-animal (heuristic)";
-    else if (personLike) note = "Categories look person/biography (heuristic)";
-    recordServiceInteraction("AnimalLookupService.wikipedia_categories", logPayload, note);
-    return { plantLike, personLike };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    recordServiceInteraction("AnimalLookupService.wikipedia_categories", logPayload, message);
-    return null;
+function resolvedTitleForCandidate(
+  candidate: string,
+  normalized: Array<{ from: string; to: string }>,
+  redirects: Array<{ from: string; to: string }>
+): string {
+  let t = candidate.trim();
+  const normHit = normalized.find((n) => n.from === t);
+  if (normHit) t = normHit.to;
+  for (let i = 0; i < 25; i++) {
+    const red = redirects.find((r) => r.from === t);
+    if (!red) break;
+    t = red.to;
   }
+  return t;
+}
+
+function findBatchPageForResolvedTitle(
+  resolved: string,
+  pagesByTitle: Map<string, WikiBatchPage>
+): WikiBatchPage | undefined {
+  let page = pagesByTitle.get(resolved);
+  if (page) return page;
+  const target = foldAnimalQuery(resolved.replace(/_/g, " "));
+  for (const [pageTitle, p] of pagesByTitle) {
+    if (foldAnimalQuery(pageTitle.replace(/_/g, " ")) === target) return p;
+  }
+  return undefined;
 }
 
 /**
- * Requests a thumbnail URL from a Wikipedia language edition (same API, different host).
+ * One batch request: categories + lead thumbnail for all candidate titles (with redirects).
  */
-async function wikipediaThumbnailUrl(
-  animalName: string,
-  lang: WikiLang
-): Promise<{ title: string; url: string | null }> {
-  const url = wikiPageImagesUrl(lang, animalName);
-  const logPayload = { animalName: animalName.trim(), lang, outbound: url };
-  const logTag = `AnimalLookupService.wikipedia.${lang}`;
+async function wikipediaBatchCategoriesPageImages(
+  lang: WikiLang,
+  titles: string[]
+): Promise<{
+  normalized: Array<{ from: string; to: string }>;
+  redirects: Array<{ from: string; to: string }>;
+  pagesByTitle: Map<string, WikiBatchPage>;
+} | null> {
+  const cleaned = titles.map((t) => t.trim()).filter(Boolean);
+  if (cleaned.length === 0) return null;
+
+  const url = wikiBatchCategoriesPageImagesUrl(lang, cleaned);
+  const logPayload = { lang, titleCount: cleaned.length, outbound: url };
+  const logTag = `AnimalLookupService.wikipedia_batch.${lang}`;
 
   try {
     const res = await fetchWithWikimediaRetry(url, logTag, logPayload);
     if (!res) {
       recordServiceInteraction(logTag, logPayload, "MediaWiki retries exhausted");
-      return { title: animalName.trim(), url: null };
+      return null;
     }
     if (!res.ok) {
-      recordServiceInteraction(logTag, logPayload, `Wikipedia HTTP ${res.status}`);
-      return { title: animalName.trim(), url: null };
+      recordServiceInteraction(logTag, logPayload, `HTTP ${res.status}`);
+      return null;
     }
 
-    const data = (await res.json()) as WikiQueryResponse;
+    const data = (await res.json()) as WikiBatchResponse;
     const pages = data.query?.pages;
     if (!pages) {
-      recordServiceInteraction(logTag, logPayload, "No pages key in Wikipedia JSON");
-      return { title: animalName.trim(), url: null };
+      recordServiceInteraction(logTag, logPayload, "No pages in batch response");
+      return null;
     }
 
-    const first = Object.values(pages)[0];
-    if (!first || first.missing !== undefined || !first.thumbnail?.source) {
-      recordServiceInteraction(
-        logTag,
-        logPayload,
-        "No thumbnail for this title (missing page or no image)"
-      );
-      return {
-        title: first?.title ?? animalName.trim(),
-        url: null,
-      };
+    const pagesByTitle = new Map<string, WikiBatchPage>();
+    for (const p of Object.values(pages)) {
+      if (p?.title) pagesByTitle.set(p.title, p);
     }
 
     recordServiceInteraction(logTag, logPayload, null);
-    return { title: first.title ?? animalName.trim(), url: first.thumbnail.source };
+    return {
+      normalized: data.query?.normalized ?? [],
+      redirects: data.query?.redirects ?? [],
+      pagesByTitle,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     recordServiceInteraction(logTag, logPayload, message);
-    return { title: animalName.trim(), url: null };
+    return null;
   }
 }
 
@@ -361,13 +528,13 @@ async function withFallbackAfterMs<T>(promise: Promise<T>, ms: number, fallback:
 }
 
 /**
- * Tries several OpenSearch candidates (plus the raw query) so ambiguous terms like "leon"
- * do not stop on the city article when a later hit is the animal (e.g. Lion).
+ * OpenSearch for titles, then one MediaWiki batch (categories + thumbnails) for all candidates.
+ * Wikidata runs only while walking candidates, using data from that batch (no extra page fetches).
  */
 async function findAnimalArticleOnWikipedia(
   queryFolded: string,
   lang: WikiLang
-): Promise<{ title: string; url: string } | null> {
+): Promise<{ imageUrl: string; wikipediaUrl: string } | null> {
   const os = await wikipediaOpenSearchTitles(queryFolded, lang, WIKI_OPENSEARCH_LIMIT);
   const hints = WIKI_TITLE_AHEAD_HINTS[queryFolded] ?? [];
   const candidates = dedupeTitlesByFold([queryFolded, ...hints, ...os]).slice(
@@ -375,21 +542,36 @@ async function findAnimalArticleOnWikipedia(
     WIKI_TITLE_TRY_MAX
   );
 
-  for (const title of candidates) {
-    const wiki = await wikipediaThumbnailUrl(title, lang);
-    if (!wiki.url) continue;
+  const batch = await wikipediaBatchCategoriesPageImages(lang, candidates);
+  if (!batch) return null;
 
-    const sig = await wikipediaTitleCategorySignals(wiki.title, lang);
-    if (sig !== null && (sig.plantLike || sig.personLike)) continue;
+  const { normalized, redirects, pagesByTitle } = batch;
 
+  for (const candidate of candidates) {
+    const resolved = resolvedTitleForCandidate(candidate, normalized, redirects);
+    const page = findBatchPageForResolvedTitle(resolved, pagesByTitle);
+    if (!page || page.missing !== undefined) continue;
+    const thumb = page.thumbnail?.source ?? null;
+    if (!thumb) continue;
+
+    const catTitles = page.categories?.map((c) => c.title) ?? [];
+    if (wikipediaCategoryBlobLooksNonAnimal(catTitles)) continue;
+    if (wikipediaCategoryBlobLooksPersonArticle(catTitles)) continue;
+    if (wikipediaCategoryBlobLooksAstronomy(catTitles)) continue;
+
+    const pageTitle = page.title?.trim() ?? resolved;
+    if (wikipediaTitleLooksAstronomyOrCosmology(pageTitle)) continue;
     const wd = await withFallbackAfterMs(
-      wikipediaArticleIsAnimalTaxon(wiki.title, lang),
+      wikipediaArticleIsAnimalTaxon(pageTitle, lang),
       WIKIDATA_ANIMAL_CHECK_BUDGET_MS,
       null
     );
     if (wd === false) continue;
 
-    return { title: wiki.title, url: wiki.url };
+    return {
+      imageUrl: thumb,
+      wikipediaUrl: wikipediaArticleUrl(lang, pageTitle),
+    };
   }
   return null;
 }
@@ -401,8 +583,8 @@ const FALLBACK_NON_ANIMAL_MESSAGE_ES =
   "Eso no es un animal asi que no lo pudimos encontrar - aqui tienes un gatito de todos modos";
 
 /**
- * Resolves an animal name. Optional API Ninjas validation, then Wikipedia (en → es)
- * with several OpenSearch candidates per language, Wikidata Animalia check, then cat fallbacks.
+ * Resolves an animal name: Wikidata label search → Animalia → P18 or Wikipedia lead image;
+ * then Wikipedia OpenSearch batch fallback; then cat. `displayName` is the user’s trimmed input on success.
  */
 export async function lookupAnimalByName(name: string): Promise<AnimalLookupResult> {
   const trimmed = name.trim();
@@ -418,6 +600,7 @@ export async function lookupAnimalByName(name: string): Promise<AnimalLookupResu
       imageUrl: catUrl,
       usedFallback: true,
       message: FALLBACK_MESSAGE_ES,
+      wikipediaUrl: null,
     };
   }
 
@@ -434,45 +617,34 @@ export async function lookupAnimalByName(name: string): Promise<AnimalLookupResu
       imageUrl: catUrl,
       usedFallback: true,
       message: FALLBACK_MESSAGE_ES,
+      wikipediaUrl: null,
     };
   }
 
   let suggestNonAnimalFallback = NON_ANIMAL_INTENT_QUERIES.has(queryFolded);
 
-  let wikiLookupFolded = queryFolded;
-  let preferredDisplayName: string | null = null;
-
-  const ninjas = await fetchNinjasAnimals(trimmed);
-  if (ninjas.status === "ok") {
-    const picked = pickNinjaAnimalRecord(ninjas.records);
-    if (!picked) {
-      recordServiceInteraction(
-        "AnimalLookupService.lookup",
-        { name: trimmed, queryFolded, source: "api_ninjas_no_animal_match" },
-        null
-      );
-      const catUrl = await fetchRandomCatImageUrl();
-      return {
-        displayName: trimmed,
-        imageUrl: catUrl ?? "",
-        usedFallback: true,
-        message: FALLBACK_NON_ANIMAL_MESSAGE_ES,
-      };
-    }
-    wikiLookupFolded = foldAnimalQuery(ninjaWikiLookupSeed(picked));
-    preferredDisplayName = picked.name.trim();
+  const wikidataHit = await findAnimalImageViaWikidataFirst(trimmed, queryFolded);
+  if (wikidataHit) {
+    return {
+      displayName: trimmed,
+      imageUrl: wikidataHit.imageUrl,
+      usedFallback: false,
+      message: null,
+      wikipediaUrl: wikidataHit.wikipediaUrl,
+    };
   }
 
   const wikiHit =
-    (await findAnimalArticleOnWikipedia(wikiLookupFolded, "en")) ??
-    (await findAnimalArticleOnWikipedia(wikiLookupFolded, "es"));
+    (await findAnimalArticleOnWikipedia(queryFolded, "en")) ??
+    (await findAnimalArticleOnWikipedia(queryFolded, "es"));
 
   if (wikiHit) {
     return {
-      displayName: preferredDisplayName ?? wikiHit.title,
-      imageUrl: wikiHit.url,
+      displayName: trimmed,
+      imageUrl: wikiHit.imageUrl,
       usedFallback: false,
       message: null,
+      wikipediaUrl: wikiHit.wikipediaUrl,
     };
   }
 
@@ -483,9 +655,10 @@ export async function lookupAnimalByName(name: string): Promise<AnimalLookupResu
     null
   );
   return {
-    displayName: preferredDisplayName ?? trimmed,
+    displayName: trimmed,
     imageUrl: catUrl ?? "",
     usedFallback: true,
     message: suggestNonAnimalFallback ? FALLBACK_NON_ANIMAL_MESSAGE_ES : FALLBACK_MESSAGE_ES,
+    wikipediaUrl: null,
   };
 }

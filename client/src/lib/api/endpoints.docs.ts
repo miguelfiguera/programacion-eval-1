@@ -24,9 +24,9 @@ export const documentedExpressEndpoints: DocumentedEndpoint[] = [
     method: 'GET',
     path: '/api/animals/lookup',
     description:
-      'Resolve an animal photo: optional API Ninjas name check, en/es Wikipedia (Wikidata Animalia), TheCatAPI fallback.',
+      'Resolve an animal photo: Wikidata search → Animalia → Commons P18 or Wikipedia thumbnail; then Wikipedia OpenSearch batch fallback; TheCatAPI fallback.',
     notes:
-      'Query `name`. With `API_NINJAS_KEY` on the server, calls https://api.api-ninjas.com/v1/animals first. Then Wikipedia (English then Spanish) trying several OpenSearch titles so ambiguous queries like "leon" can still match the animal. Wikidata kingdom Animalia filter. Fallback cat image: TheCatAPI (optional `CAT_API_KEY`) then Cataas. Response: `{ displayName, imageUrl, usedFallback, message }`.',
+      'Query `name`. Primary path uses `wbsearchentities` (es then en hits), checks taxon is under kingdom Animalia, prefers Wikidata P18 (scaled via Commons Special:FilePath) for a fast image, else one Wikipedia `pageimages` call. Article link prefers en/es sitelinks, else Wikidata entity URL. Fallback: batched Wikipedia queries + Wikidata validation per title. Response `{ displayName, imageUrl, usedFallback, message, wikipediaUrl }`.',
   },
   {
     method: 'GET',

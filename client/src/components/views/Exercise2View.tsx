@@ -1,11 +1,20 @@
 import type { FormEvent } from 'react'
+import { useMemo, useState } from 'react'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { MovieDiscoverResponseDto } from '@/lib/api/dto'
+import { type MovieSortKey, sortMovies } from '@/lib/movie-sort'
 import type { MovieCountryIso, MovieGenreTmdb } from '@/lib/types/movie.enums'
 import { AlertCircle } from 'lucide-react'
+
+const MOVIE_SORT_LABELS: Record<MovieSortKey, string> = {
+  year: 'Año',
+  director: 'Director',
+  date: 'Fecha de estreno',
+  title: 'Título',
+}
 
 export type Exercise2ViewProps = {
   enumGenreEntries: Array<{ id: number; label: string }>
@@ -33,6 +42,18 @@ export function Exercise2View({
   movies,
   onDiscover,
 }: Exercise2ViewProps) {
+  const [sortBy, setSortBy] = useState<MovieSortKey>('year')
+  /** false = descendente (p. ej. año: más reciente primero). */
+  const [sortDesc, setSortDesc] = useState(true)
+
+  const sortedMovies = useMemo(() => {
+    if (!movies?.results.length) return []
+    return sortMovies(movies.results, sortBy, !sortDesc)
+  }, [movies, sortBy, sortDesc])
+
+  const selectClassName =
+    'h-9 min-w-[10rem] rounded-lg border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
       <Card>
@@ -128,29 +149,68 @@ export function Exercise2View({
           )}
 
           {movies && movies.results.length > 0 && (
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {movies.results.map((m, i) => (
-                <li
-                  key={`${m.title}-${m.releaseDate ?? 'nodate'}-${i}`}
-                  className="flex gap-3 rounded-lg border border-border p-3"
-                >
-                  {m.posterUrl && (
-                    <img
-                      src={m.posterUrl}
-                      alt=""
-                      className="h-28 w-20 shrink-0 rounded object-cover"
-                    />
-                  )}
-                  <div className="min-w-0 text-sm">
-                    <p className="font-medium">{m.title}</p>
-                    <p className="text-muted-foreground">{m.releaseDate}</p>
-                    <p className="mt-1 line-clamp-4 text-muted-foreground">
-                      {m.overview}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-sm text-foreground">
+                  Ordenar por
+                  <select
+                    className={selectClassName}
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as MovieSortKey)}
+                  >
+                    {(Object.keys(MOVIE_SORT_LABELS) as MovieSortKey[]).map((k) => (
+                      <option key={k} value={k} className="bg-popover text-popover-foreground">
+                        {MOVIE_SORT_LABELS[k]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm text-foreground">
+                  Orden
+                  <select
+                    className={selectClassName}
+                    value={sortDesc ? 'desc' : 'asc'}
+                    onChange={(e) => setSortDesc(e.target.value === 'desc')}
+                  >
+                    <option value="desc" className="bg-popover text-popover-foreground">
+                      Descendente
+                    </option>
+                    <option value="asc" className="bg-popover text-popover-foreground">
+                      Ascendente
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <ul className="flex flex-col gap-3">
+                {sortedMovies.map((m) => (
+                  <li
+                    key={m.id || `${m.title}-${m.releaseDate ?? 'x'}`}
+                    className="flex gap-4 rounded-lg border border-border p-4"
+                  >
+                    {m.posterUrl && (
+                      <img
+                        src={m.posterUrl}
+                        alt=""
+                        className="h-32 w-[5.5rem] shrink-0 rounded object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1 text-sm">
+                      <p className="text-base font-medium">{m.title}</p>
+                      <p className="text-muted-foreground">
+                        {m.releaseDate ?? 'Sin fecha'}
+                        {m.director != null && m.director !== '' ? (
+                          <>
+                            <span className="mx-1.5 text-border">·</span>
+                            Director: {m.director}
+                          </>
+                        ) : null}
+                      </p>
+                      <p className="mt-2 line-clamp-5 text-muted-foreground">{m.overview}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </CardContent>
       </Card>
