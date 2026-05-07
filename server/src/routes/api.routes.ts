@@ -26,7 +26,7 @@ router.get("/health", (_req: Request, res: Response) => {
 });
 
 /**
- * JSON proxy for animal lookup — calls Wikipedia then TheCatAPI fallback.
+ * JSON proxy for animal lookup — Wikipedia (en/es) + Wikidata Animalia check, TheCatAPI fallback.
  * Query: ?name=lion
  */
 router.get("/animals/lookup", async (req: Request, res: Response) => {

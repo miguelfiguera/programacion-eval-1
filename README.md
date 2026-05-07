@@ -33,17 +33,18 @@ El build compila el cliente a `client/dist/` y el servidor a `server/dist/`. Exp
 
 ## API
 
-| Metodo | Ruta                     | Descripcion                                      |
-| ------ | ------------------------ | ------------------------------------------------ |
-| `GET`  | `/api/health`            | Health check                                     |
-| `GET`  | `/api/animals/lookup`    | Foto de animal (Wikipedia / TheCatAPI fallback)  |
+| Metodo | Ruta                     | Descripcion                                                         |
+| ------ | ------------------------ | ------------------------------------------------------------------- |
+| `GET`  | `/api/health`            | Health check                                                        |
+| `GET`  | `/api/animals/lookup`    | Foto de animal (API Ninjas si hay clave, Wikipedia en/es, gato) |
 | `GET`  | `/api/cats/daily`        | Gato aleatorio + dato (TheCatAPI + CatFact)      |
 | `GET`  | `/api/movies/discover`   | Peliculas TMDB (genre + country)                 |
 | `GET`  | `/api/logs/recent`       | Ultimos logs de peticiones en SQLite             |
 
 ## Variables de entorno
 
-| Variable      | Default                  | Descripcion              |
-| ------------- | ------------------------ | ------------------------ |
-| `PORT`        | `3001`                   | Puerto del servidor      |
-| `SQLITE_PATH` | `server/data/app.db`     | Ruta al archivo SQLite   |
+| Variable          | Default                  | Descripcion                                              |
+| ----------------- | ------------------------ | -------------------------------------------------------- |
+| `PORT`            | `3001`                   | Puerto del servidor                                      |
+| `SQLITE_PATH`     | `server/data/app.db`     | Ruta al archivo SQLite                                   |
+| `API_NINJAS_KEY`  | —                        | Opcional y recomendada: valida nombres de animales reales |

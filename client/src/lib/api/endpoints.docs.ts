@@ -24,9 +24,9 @@ export const documentedExpressEndpoints: DocumentedEndpoint[] = [
     method: 'GET',
     path: '/api/animals/lookup',
     description:
-      'Resolve an animal photo: en/es Wikipedia, iNaturalist (Animalia only), TheCatAPI.',
+      'Resolve an animal photo: optional API Ninjas name check, en/es Wikipedia (Wikidata Animalia), TheCatAPI fallback.',
     notes:
-      'Query `name`. Normalizes Unicode; tries en/es Wikipedia (+ OpenSearch), then iNaturalist Animalia-only taxa (no key), then random cat. Response: `{ displayName, imageUrl, usedFallback, message }`.',
+      'Query `name`. With `API_NINJAS_KEY` on the server, calls https://api.api-ninjas.com/v1/animals first so queries like brands do not resolve to Wikipedia companies. Then Wikipedia (English then Spanish), Wikidata check for kingdom Animalia, then random cat. Response: `{ displayName, imageUrl, usedFallback, message }`.',
   },
   {
     method: 'GET',

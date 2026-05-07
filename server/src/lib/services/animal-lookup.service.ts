@@ -1,6 +1,12 @@
 import type { AnimalLookupResult } from "../../types/animal.types.js";
+import {
+  fetchNinjasAnimals,
+  ninjaWikiLookupSeed,
+  pickNinjaAnimalRecord,
+} from "./animals-ninjas.service.js";
 import { fetchRandomCatImageUrl } from "./cat-api.service.js";
 import { recordServiceInteraction } from "./request-log.service.js";
+import { wikipediaArticleIsAnimalTaxon } from "./wikidata-animal.service.js";
 
 const USER_AGENT = "EvalHomework/1.0 (educational; contact student)";
 
@@ -11,8 +17,36 @@ const WIKI_ORIGINS = {
 
 type WikiLang = keyof typeof WIKI_ORIGINS;
 
-/** iNaturalist: kingdom Animalia taxon id in `ancestor_ids` (metazoa / animals only). */
-const INAT_ANIMALIA_TAXON_ID = 1;
+/** Wikidata graph walk can be slow; treat as inconclusive (null) so Wikipedia can still be used. */
+const WIKIDATA_ANIMAL_CHECK_BUDGET_MS = 8500;
+
+/**
+ * Search terms we treat as clearly not animals (plants, drugs, etc.) for user-facing copy.
+ */
+const NON_ANIMAL_INTENT_QUERIES = new Set([
+  "alcohol",
+  "arabica",
+  "cacao",
+  "cannabis",
+  "coca",
+  "cocaina",
+  "cocaine",
+  "hemp",
+  "heroin",
+  "heroina",
+  "indica",
+  "marihuana",
+  "marijuana",
+  "nicotina",
+  "nicotine",
+  "opio",
+  "opium",
+  "papaver",
+  "sativa",
+  "tabacum",
+  "tabaco",
+  "tobacco",
+]);
 
 /**
  * Folds user input for Wikipedia matching: trim, strip combining marks (accents),
@@ -47,6 +81,104 @@ function wikiPageImagesUrl(lang: WikiLang, title: string): string {
 
 function wikiOpenSearchUrl(lang: WikiLang, query: string): string {
   return `${WIKI_ORIGINS[lang]}/w/api.php?action=opensearch&format=json&limit=5&namespace=0&search=${encodeURIComponent(query)}`;
+}
+
+type WikiCategoriesResponse = {
+  query?: {
+    pages?: Record<
+      string,
+      {
+        title?: string;
+        categories?: Array<{ title: string }>;
+      }
+    >;
+  };
+};
+
+/** Heuristic: category titles suggest plant / fungus / non-target topic. */
+function wikipediaCategoryBlobLooksNonAnimal(categoryTitles: string[]): boolean {
+  const blob = categoryTitles.join(" | ").toLowerCase();
+  const patterns: RegExp[] = [
+    /\bplantae\b/,
+    /\bplants?\b/,
+    /\bfungi\b/,
+    /\bbotan/i,
+    /\bflora\b/,
+    /\bherbs?\b/,
+    /\bvegetables?\b/,
+    /\bflowers?\b/,
+    /\balgae\b/,
+    /\brosales\b/,
+    /\bcannabis\b/,
+    /\bcrops?\b/,
+    /\btrees?\b/,
+    /\bshrubs?\b/,
+    /\bfruits?\b/,
+    /\bdioecious\b/,
+    /\bevergreen\b/,
+    /\bdeciduous\b/,
+    /\bpoales\b/,
+    /\basteraceae\b/,
+  ];
+  return patterns.some((p) => p.test(blob));
+}
+
+/**
+ * true → reject Wikipedia image for animal lookup (plant-like categories).
+ * false → categories loaded, no plant/fungi heuristic match.
+ * null → unavailable; do not block on this signal alone.
+ */
+async function wikipediaTitleCategoriesLookPlant(
+  title: string,
+  lang: WikiLang
+): Promise<boolean | null> {
+  const enc = encodeURIComponent(title.trim());
+  const url = `${WIKI_ORIGINS[lang]}/w/api.php?action=query&format=json&prop=categories&cllimit=50&clshow=!hidden&titles=${enc}`;
+  const logPayload = { title: title.trim(), lang, outbound: url };
+
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+    });
+    if (!res.ok) {
+      recordServiceInteraction(
+        "AnimalLookupService.wikipedia_categories",
+        logPayload,
+        `HTTP ${res.status}`
+      );
+      return null;
+    }
+
+    const data = (await res.json()) as WikiCategoriesResponse;
+    const pages = data.query?.pages;
+    if (!pages) {
+      recordServiceInteraction("AnimalLookupService.wikipedia_categories", logPayload, "No pages");
+      return null;
+    }
+
+    const first = Object.values(pages)[0];
+    const cats = first?.categories?.map((c) => c.title) ?? [];
+    if (cats.length === 0) {
+      recordServiceInteraction(
+        "AnimalLookupService.wikipedia_categories",
+        logPayload,
+        "No categories"
+      );
+      return null;
+    }
+
+    const planty = wikipediaCategoryBlobLooksNonAnimal(cats);
+    recordServiceInteraction(
+      "AnimalLookupService.wikipedia_categories",
+      logPayload,
+      planty ? "Categories look plant/fungus/non-animal (heuristic)" : null
+    );
+    return planty;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    recordServiceInteraction("AnimalLookupService.wikipedia_categories", logPayload, message);
+    return null;
+  }
 }
 
 /**
@@ -135,65 +267,19 @@ async function wikipediaOpenSearchFirstTitle(
   }
 }
 
-type InatTaxaResponse = {
-  results?: Array<{
-    name: string;
-    preferred_common_name?: string | null;
-    ancestor_ids?: number[];
-    default_photo?: { medium_url?: string; url?: string } | null;
-  }>;
-};
-
-/**
- * Free iNaturalist taxa search (no API key). Keeps only taxa under kingdom Animalia.
- */
-async function inaturalistFirstAnimalPhoto(
-  query: string
-): Promise<{ title: string; url: string | null }> {
-  const url = `https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(
-    query
-  )}&per_page=20&order=desc&order_by=observations_count`;
-  const logPayload = { query, outbound: url };
-
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    });
-    if (!res.ok) {
-      recordServiceInteraction(
-        "AnimalLookupService.inaturalist",
-        logPayload,
-        `iNaturalist HTTP ${res.status}`
-      );
-      return { title: query, url: null };
-    }
-
-    const data = (await res.json()) as InatTaxaResponse;
-    const rows = data.results ?? [];
-    const pick = rows.find(
-      (r) =>
-        Boolean(r.default_photo?.medium_url) &&
-        Array.isArray(r.ancestor_ids) &&
-        r.ancestor_ids.includes(INAT_ANIMALIA_TAXON_ID)
-    );
-
-    if (!pick?.default_photo?.medium_url) {
-      recordServiceInteraction(
-        "AnimalLookupService.inaturalist",
-        logPayload,
-        "No Animalia taxon with photo in iNaturalist results"
-      );
-      return { title: query, url: null };
-    }
-
-    recordServiceInteraction("AnimalLookupService.inaturalist", logPayload, null);
-    const title = pick.preferred_common_name?.trim() || pick.name;
-    return { title, url: pick.default_photo.medium_url };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    recordServiceInteraction("AnimalLookupService.inaturalist", logPayload, message);
-    return { title: query, url: null };
-  }
+async function withFallbackAfterMs<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        resolve(fallback);
+      });
+  });
 }
 
 async function resolveViaWikipediaLang(
@@ -213,8 +299,12 @@ async function resolveViaWikipediaLang(
 const FALLBACK_MESSAGE_ES =
   "Ups, no lo pudimos encontrar, pero aqui tienes un gatito.";
 
+const FALLBACK_NON_ANIMAL_MESSAGE_ES =
+  "Eso no es un animal asi que no lo pudimos encontrar - aqui tienes un gatito de todos modos";
+
 /**
- * Resolves an animal name: English Wikipedia → Spanish Wikipedia → iNaturalist → TheCatAPI.
+ * Resolves an animal name. Optional API Ninjas validation, then Wikipedia (en → es),
+ * Wikidata kingdom Animalia check, TheCatAPI fallback.
  */
 export async function lookupAnimalByName(name: string): Promise<AnimalLookupResult> {
   const trimmed = name.trim();
@@ -249,28 +339,88 @@ export async function lookupAnimalByName(name: string): Promise<AnimalLookupResu
     };
   }
 
-  let wiki = await resolveViaWikipediaLang(queryFolded, "en");
+  let suggestNonAnimalFallback = NON_ANIMAL_INTENT_QUERIES.has(queryFolded);
+
+  let wikiLookupFolded = queryFolded;
+  let preferredDisplayName: string | null = null;
+
+  const ninjas = await fetchNinjasAnimals(trimmed);
+  if (ninjas.status === "ok") {
+    const picked = pickNinjaAnimalRecord(ninjas.records);
+    if (!picked) {
+      recordServiceInteraction(
+        "AnimalLookupService.lookup",
+        { name: trimmed, queryFolded, source: "api_ninjas_no_animal_match" },
+        null
+      );
+      const catUrl = await fetchRandomCatImageUrl();
+      return {
+        displayName: trimmed,
+        imageUrl: catUrl ?? "",
+        usedFallback: true,
+        message: FALLBACK_NON_ANIMAL_MESSAGE_ES,
+      };
+    }
+    wikiLookupFolded = foldAnimalQuery(ninjaWikiLookupSeed(picked));
+    preferredDisplayName = picked.name.trim();
+  }
+
+  let wikiLang: WikiLang | null = null;
+  let wiki = await resolveViaWikipediaLang(wikiLookupFolded, "en");
+  if (wiki.url) wikiLang = "en";
   if (!wiki.url) {
-    wiki = await resolveViaWikipediaLang(queryFolded, "es");
+    wiki = await resolveViaWikipediaLang(wikiLookupFolded, "es");
+    if (wiki.url) wikiLang = "es";
   }
 
-  if (wiki.url) {
-    return {
-      displayName: wiki.title,
-      imageUrl: wiki.url,
-      usedFallback: false,
-      message: null,
-    };
-  }
+  if (wiki.url && wikiLang) {
+    let acceptWikipedia = true;
 
-  const inat = await inaturalistFirstAnimalPhoto(queryFolded);
-  if (inat.url) {
-    return {
-      displayName: inat.title,
-      imageUrl: inat.url,
-      usedFallback: true,
-      message: null,
-    };
+    const plantCategories = await wikipediaTitleCategoriesLookPlant(wiki.title, wikiLang);
+    if (plantCategories === true) {
+      suggestNonAnimalFallback = true;
+      acceptWikipedia = false;
+      recordServiceInteraction(
+        "AnimalLookupService.lookup",
+        {
+          name: trimmed,
+          queryFolded,
+          wikipediaTitle: wiki.title,
+          note: "wikipedia_rejected_plant_like_categories",
+        },
+        null
+      );
+    }
+
+    if (acceptWikipedia) {
+      const wikidataConfirmsAnimal = await withFallbackAfterMs(
+        wikipediaArticleIsAnimalTaxon(wiki.title, wikiLang),
+        WIKIDATA_ANIMAL_CHECK_BUDGET_MS,
+        null
+      );
+      if (wikidataConfirmsAnimal === false) {
+        acceptWikipedia = false;
+        recordServiceInteraction(
+          "AnimalLookupService.lookup",
+          {
+            name: trimmed,
+            queryFolded,
+            wikipediaTitle: wiki.title,
+            note: "wikipedia_rejected_wikidata_not_under_animalia",
+          },
+          null
+        );
+      }
+    }
+
+    if (acceptWikipedia) {
+      return {
+        displayName: preferredDisplayName ?? wiki.title,
+        imageUrl: wiki.url,
+        usedFallback: false,
+        message: null,
+      };
+    }
   }
 
   const catUrl = await fetchRandomCatImageUrl();
@@ -280,9 +430,9 @@ export async function lookupAnimalByName(name: string): Promise<AnimalLookupResu
     null
   );
   return {
-    displayName: wiki.title,
+    displayName: preferredDisplayName ?? trimmed,
     imageUrl: catUrl ?? "",
     usedFallback: true,
-    message: FALLBACK_MESSAGE_ES,
+    message: suggestNonAnimalFallback ? FALLBACK_NON_ANIMAL_MESSAGE_ES : FALLBACK_MESSAGE_ES,
   };
 }
