@@ -1,0 +1,17 @@
+{
+  "name": "express-sqlite-react-app",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "start": "npm run start -w server",
+    "build": "npm run build -w client && npm run build -w server",
+    "postbuild": "echo Build client output is in client/dist — serve it from Express or any static host"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
