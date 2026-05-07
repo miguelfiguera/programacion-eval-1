@@ -36,7 +36,14 @@ export async function fetchAnimalLookup(name: string): Promise<AnimalLookupResul
   const q = new URLSearchParams({ name })
   const res = await fetch(`${BackendRoutes.animalLookup}?${q}`)
   if (!res.ok) throw new Error(await readError(res))
-  return res.json() as Promise<AnimalLookupResultDto>
+  const text = await res.text()
+  try {
+    return JSON.parse(text) as AnimalLookupResultDto
+  } catch {
+    throw new Error(
+      'La API no devolvió JSON. Comprueba que el servidor esté en marcha y que la petición llegue a /api/animals/lookup.',
+    )
+  }
 }
 
 export async function fetchCatOfDay(): Promise<CatOfDayDto> {

@@ -77,33 +77,33 @@ export function Exercise2View({
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <form className="flex flex-wrap items-end gap-3" onSubmit={onDiscover}>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className="flex flex-col gap-1 text-sm text-foreground">
               Género
               <select
-                className="h-8 rounded-lg border border-input bg-transparent px-2"
+                className="h-9 min-w-[12rem] rounded-lg border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={genre}
                 onChange={(e) =>
                   onGenreChange(Number(e.target.value) as MovieGenreTmdb)
                 }
               >
                 {enumGenreEntries.map((g) => (
-                  <option key={g.id} value={g.id}>
+                  <option key={g.id} value={g.id} className="bg-popover text-popover-foreground">
                     {g.label}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className="flex flex-col gap-1 text-sm text-foreground">
               País
               <select
-                className="h-8 rounded-lg border border-input bg-transparent px-2"
+                className="h-9 min-w-[12rem] rounded-lg border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={country}
                 onChange={(e) =>
                   onCountryChange(e.target.value as MovieCountryIso)
                 }
               >
                 {enumCountryEntries.map((c) => (
-                  <option key={c.code} value={c.code}>
+                  <option key={c.code} value={c.code} className="bg-popover text-popover-foreground">
                     {c.label}
                   </option>
                 ))}

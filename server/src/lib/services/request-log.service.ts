@@ -11,5 +11,10 @@ export function recordServiceInteraction(
   requestPayload: LoggableRequestPayload,
   errorLog: string | null
 ): number {
-  return insertRequestLog(endpoint, requestPayload, errorLog);
+  try {
+    return insertRequestLog(endpoint, requestPayload, errorLog);
+  } catch (err) {
+    console.error("SQLite request log insert failed (request continues):", err);
+    return 0;
+  }
 }

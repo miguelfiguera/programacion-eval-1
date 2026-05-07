@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { fetchAnimalLookup } from '@/lib/api/backend'
 import type { AnimalLookupResultDto } from '@/lib/api/dto'
@@ -15,6 +15,9 @@ export function useAnimalLookup(options?: UseAnimalLookupOptions) {
   const favoriteFromUrl = options?.favoriteFromUrl?.trim() ?? ''
 
   const [name, setName] = useState(() => favoriteFromUrl)
+  const nameRef = useRef(name)
+  nameRef.current = name
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnimalLookupResultDto | null>(null)
@@ -45,25 +48,22 @@ export function useAnimalLookup(options?: UseAnimalLookupOptions) {
     }
   }, [favoriteFromUrl])
 
-  const search = useCallback(
-    async (e?: FormEvent) => {
-      e?.preventDefault()
-      const q = name.trim()
-      if (!q || loading) return
-      setLoading(true)
-      setError(null)
-      setResult(null)
-      try {
-        const data = await fetchAnimalLookup(q)
-        setResult(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err))
-      } finally {
-        setLoading(false)
-      }
-    },
-    [name, loading],
-  )
+  const search = useCallback(async (e?: FormEvent) => {
+    e?.preventDefault()
+    const q = nameRef.current.trim()
+    if (!q) return
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    try {
+      const data = await fetchAnimalLookup(q)
+      setResult(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   /** Clears search result and error (e.g. before showing “Gato del día”). */
   const clear = useCallback(() => {

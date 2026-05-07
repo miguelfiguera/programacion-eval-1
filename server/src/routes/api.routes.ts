@@ -30,7 +30,13 @@ router.get("/health", (_req: Request, res: Response) => {
  * Query: ?name=lion
  */
 router.get("/animals/lookup", async (req: Request, res: Response) => {
-  const name = typeof req.query.name === "string" ? req.query.name : "";
+  const raw = req.query.name;
+  const name =
+    typeof raw === "string"
+      ? raw
+      : Array.isArray(raw) && typeof raw[0] === "string"
+        ? raw[0]
+        : "";
   if (!name.trim()) {
     return res.status(400).json({ error: "name query parameter is required" });
   }

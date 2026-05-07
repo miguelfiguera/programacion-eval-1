@@ -18,9 +18,6 @@ function foldAnimalQuery(raw: string): string {
     .toLowerCase();
 }
 
-/** OpenSearch response shape: [searchTerm, titles[], descriptions[], urls[]]. */
-type WikiOpenSearchTuple = [string, string[], string[], string[]];
-
 type WikiQueryResponse = {
   query?: {
     pages?: Record<
@@ -114,8 +111,16 @@ async function wikipediaOpenSearchFirstTitle(
       );
       return null;
     }
-    const data = (await res.json()) as WikiOpenSearchTuple;
-    const titles = data[1];
+    const data: unknown = await res.json();
+    if (!Array.isArray(data) || !Array.isArray(data[1])) {
+      recordServiceInteraction(
+        "AnimalLookupService.wikipedia_opensearch",
+        logPayload,
+        "OpenSearch JSON shape unexpected"
+      );
+      return null;
+    }
+    const titles = data[1] as string[];
     const first = titles?.[0]?.trim();
     if (!first) {
       recordServiceInteraction(
