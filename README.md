@@ -31,6 +31,10 @@ npm start
 
 El build compila el cliente a `client/dist/` y el servidor a `server/dist/`. Express sirve los archivos estaticos del cliente y la API desde el puerto 3001.
 
+## Documentacion visual
+
+Capturas de pantalla del flujo en **docs/capturas/** (`docs/capturas/README.md`).
+
 ## API
 
 | Metodo | Ruta                     | Descripcion                                                         |
@@ -48,3 +52,4 @@ El build compila el cliente a `client/dist/` y el servidor a `server/dist/`. Exp
 | `PORT`            | `3001`                   | Puerto del servidor                                      |
 | `SQLITE_PATH`     | `server/data/app.db`     | Ruta al archivo SQLite                                   |
 | `API_NINJAS_KEY`  | —                        | Opcional y recomendada: valida nombres de animales reales |
+| `CAT_API_KEY`     | —                        | Opcional: TheCatAPI; si falla, se usa Cataas como respaldo |

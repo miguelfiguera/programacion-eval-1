@@ -26,7 +26,7 @@ export const documentedExpressEndpoints: DocumentedEndpoint[] = [
     description:
       'Resolve an animal photo: optional API Ninjas name check, en/es Wikipedia (Wikidata Animalia), TheCatAPI fallback.',
     notes:
-      'Query `name`. With `API_NINJAS_KEY` on the server, calls https://api.api-ninjas.com/v1/animals first so queries like brands do not resolve to Wikipedia companies. Then Wikipedia (English then Spanish), Wikidata check for kingdom Animalia, then random cat. Response: `{ displayName, imageUrl, usedFallback, message }`.',
+      'Query `name`. With `API_NINJAS_KEY` on the server, calls https://api.api-ninjas.com/v1/animals first. Then Wikipedia (English then Spanish) trying several OpenSearch titles so ambiguous queries like "leon" can still match the animal. Wikidata kingdom Animalia filter. Fallback cat image: TheCatAPI (optional `CAT_API_KEY`) then Cataas. Response: `{ displayName, imageUrl, usedFallback, message }`.',
   },
   {
     method: 'GET',
