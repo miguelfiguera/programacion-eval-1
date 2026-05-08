@@ -1,5 +1,5 @@
 import { recordServiceInteraction } from "./request-log.service.js";
-import { fetchWithWikimediaRetry } from "../wikimedia-http.js";
+import { delay, fetchWithWikimediaRetry } from "../wikimedia-http.js";
 
 const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
 /** Kingdom Animalia — https://www.wikidata.org/wiki/Q729 */
@@ -133,13 +133,8 @@ export async function wikidataGetEntitiesClaimsAndSitelinks(
     const e = entities[qid];
     if (e && e.missing === undefined) out[qid] = e;
   }
-  await delay(80);
   recordServiceInteraction("WikidataAnimalService.wbgetentities_sitelinks", logPayload, null);
   return out;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function claimItemIds(entity: WikidataEntity | undefined, property: string): string[] {
@@ -269,7 +264,6 @@ async function wbGetEntitiesBatch(
       return null;
     }
   }
-  await delay(80);
   return entities;
 }
 

@@ -3,6 +3,29 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { fetchAnimalLookup } from '@/lib/api/backend'
 import type { AnimalLookupResultDto } from '@/lib/api/dto'
 
+const CAT_API_URL = 'https://api.thecatapi.com/v1/images/search?limit=1'
+const FALLBACK_ERROR_MSG = 'Error; pero aqui tienes un gatito.'
+
+async function clientSideCatFallback(displayName: string): Promise<AnimalLookupResultDto> {
+  let imageUrl = ''
+  try {
+    const res = await fetch(CAT_API_URL)
+    if (res.ok) {
+      const data = (await res.json()) as Array<{ url?: string }>
+      imageUrl = data[0]?.url ?? ''
+    }
+  } catch {
+    // cat API also failed — show message without image
+  }
+  return {
+    displayName,
+    imageUrl,
+    usedFallback: true,
+    message: FALLBACK_ERROR_MSG,
+    wikipediaUrl: null,
+  }
+}
+
 /** Fases mostradas mientras el backend resuelve la búsqueda (orden alineado al pipeline del servidor). */
 export const ANIMAL_LOOKUP_LOADING_PHASES = [
   'Paso 1/4 — Wikidata: buscando entidades por tu texto…',
@@ -59,9 +82,10 @@ export function useAnimalLookup(options?: UseAnimalLookupOptions) {
       try {
         const data = await fetchAnimalLookup(favoriteFromUrl)
         if (!cancelled) setResult(data)
-      } catch (err) {
+      } catch {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
+          const fallback = await clientSideCatFallback(favoriteFromUrl)
+          if (!cancelled) setResult(fallback)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -83,8 +107,9 @@ export function useAnimalLookup(options?: UseAnimalLookupOptions) {
     try {
       const data = await fetchAnimalLookup(q)
       setResult(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+    } catch {
+      const fallback = await clientSideCatFallback(q)
+      setResult(fallback)
     } finally {
       setLoading(false)
     }

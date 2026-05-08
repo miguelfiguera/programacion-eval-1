@@ -47,10 +47,14 @@ Capturas de pantalla del flujo en **docs/capturas/** (`docs/capturas/README.md`)
 
 ## Variables de entorno
 
-| Variable          | Default                  | Descripcion                                              |
-| ----------------- | ------------------------ | -------------------------------------------------------- |
-| `PORT`            | `3001`                   | Puerto del servidor                                      |
-| `SQLITE_PATH`     | `server/data/app.db`     | Ruta al archivo SQLite                                   |
-| `CAT_API_KEY`     | —                        | Opcional: TheCatAPI; si falla, se usa Cataas como respaldo |
+| Variable                 | Default              | Descripcion                                              |
+| ------------------------ | -------------------- | -------------------------------------------------------- |
+| `PORT`                   | `3001`               | Puerto del servidor                                      |
+| `SQLITE_PATH`            | `server/data/app.db` | Ruta al archivo SQLite                                   |
+| `CAT_API_KEY`            | —                    | Opcional: TheCatAPI; si falla, se usa Cataas como respaldo |
+| `TMDB_API_KEY`           | —                    | API key v3 de TMDB para descubrir peliculas              |
+| `TMDB_READ_ACCESS_TOKEN` | —                    | Token JWT de lectura de TMDB (alternativa Bearer)        |
 
-Las peticiones HTTP salientes usan un `User-Agent` con contacto (`miguelqui725@gmail.com`) para APIs públicas (Wikimedia, etc.).
+El archivo `.env` esta incluido en el repositorio intencionalmente. Las claves que contiene son de APIs publicas y gratuitas (TheCatAPI, TMDB) creadas exclusivamente para este ejercicio universitario. No representan un riesgo de seguridad real; se dejan commiteadas para que el profesor y los revisores puedan ejecutar el proyecto sin configuracion adicional.
+
+Las peticiones HTTP salientes usan un `User-Agent` con contacto (`miguelqui725@gmail.com`) para APIs publicas (Wikimedia, etc.).

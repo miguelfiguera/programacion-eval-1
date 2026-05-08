@@ -1,4 +1,4 @@
-import { HTTP_USER_AGENT } from "../wikimedia-http.js";
+import { delay, HTTP_USER_AGENT } from "../wikimedia-http.js";
 import { recordServiceInteraction } from "./request-log.service.js";
 
 const CAT_IMAGE_ENDPOINT = "https://api.thecatapi.com/v1/images/search?limit=1";
@@ -8,10 +8,6 @@ export type CatApiImage = {
   id?: string;
   url?: string;
 };
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function fetchTheCatApiOnce(): Promise<string | null> {
   const payload = { outbound: CAT_IMAGE_ENDPOINT };

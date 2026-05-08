@@ -9,7 +9,7 @@ export const HTTP_USER_AGENT =
 const FETCH_TIMEOUT_MS = 25_000;
 const MAX_ATTEMPTS = 6;
 
-function delay(ms: number): Promise<void> {
+export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
