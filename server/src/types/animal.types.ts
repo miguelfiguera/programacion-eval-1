@@ -1,25 +1,17 @@
 /**
- * Normalized response after resolving an animal image (Wikipedia or cat fallback).
+ * Normalized response after resolving an animal image (Pexels or cat fallback).
  */
 export type AnimalLookupResult = {
-  /** Display name chosen for the user (trimmed input or Wikipedia title). */
   displayName: string;
-  /** HTTPS URL suitable for an <img src>. */
   imageUrl: string;
-  /** True when Wikipedia (or primary source) did not yield a usable image. */
   usedFallback: boolean;
-  /**
-   * User-facing message when fallback is used (Spanish copy for the exercise).
-   * Null when the primary lookup succeeded.
-   */
   message: string | null;
-  /** Article URL when `imageUrl` came from Wikipedia; otherwise null. */
-  wikipediaUrl: string | null;
+  /** Pexels page URL for the photo, or null on fallback. */
+  sourceUrl: string | null;
+  /** Photographer credit from Pexels, or null on fallback. */
+  photographer: string | null;
 };
 
-/**
- * Query params accepted by GET /api/animals/lookup
- */
 export type AnimalLookupQuery = {
   name: string;
 };

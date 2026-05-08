@@ -6,8 +6,8 @@ export type AnimalLookupResultDto = {
   imageUrl: string
   usedFallback: boolean
   message: string | null
-  /** Present when the image is from Wikipedia (en or es). */
-  wikipediaUrl: string | null
+  sourceUrl: string | null
+  photographer: string | null
 }
 
 /**

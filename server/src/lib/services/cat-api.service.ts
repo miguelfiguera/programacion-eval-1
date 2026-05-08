@@ -1,5 +1,8 @@
-import { delay, HTTP_USER_AGENT } from "../wikimedia-http.js";
 import { recordServiceInteraction } from "./request-log.service.js";
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const CAT_IMAGE_ENDPOINT = "https://api.thecatapi.com/v1/images/search?limit=1";
 const CATAAS_CAT_JSON = "https://cataas.com/cat?json=true";
@@ -14,7 +17,7 @@ async function fetchTheCatApiOnce(): Promise<string | null> {
   try {
     const headers: Record<string, string> = {
       Accept: "application/json",
-      "User-Agent": HTTP_USER_AGENT,
+      "User-Agent": "EvalHomework/1.0",
     };
     const apiKey = process.env.CAT_API_KEY;
     if (apiKey) {
@@ -56,7 +59,7 @@ async function fetchCataasCatImageUrl(): Promise<string | null> {
   const payload = { outbound: CATAAS_CAT_JSON };
   try {
     const res = await fetch(CATAAS_CAT_JSON, {
-      headers: { Accept: "application/json", "User-Agent": HTTP_USER_AGENT },
+      headers: { Accept: "application/json", "User-Agent": "EvalHomework/1.0" },
     });
     if (!res.ok) {
       recordServiceInteraction("CatApiService.cataas", payload, `HTTP ${res.status}`);

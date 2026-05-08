@@ -24,9 +24,9 @@ export const documentedExpressEndpoints: DocumentedEndpoint[] = [
     method: 'GET',
     path: '/api/animals/lookup',
     description:
-      'Resolve an animal photo: Wikidata search → Animalia → Commons P18 or Wikipedia thumbnail; then Wikipedia OpenSearch batch fallback; TheCatAPI fallback.',
+      'Busca una foto de animal en Pexels; si no encuentra, devuelve un gato vía TheCatAPI.',
     notes:
-      'Query `name`. Primary path uses `wbsearchentities` (es then en hits), checks taxon is under kingdom Animalia, prefers Wikidata P18 (scaled via Commons Special:FilePath) for a fast image, else one Wikipedia `pageimages` call. Article link prefers en/es sitelinks, else Wikidata entity URL. Fallback: batched Wikipedia queries + Wikidata validation per title. Response `{ displayName, imageUrl, usedFallback, message, wikipediaUrl }`.',
+      'Query `name`. Response `{ displayName, imageUrl, usedFallback, message, sourceUrl, photographer }`.',
   },
   {
     method: 'GET',

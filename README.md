@@ -40,7 +40,7 @@ Capturas de pantalla del flujo en **docs/capturas/** (`docs/capturas/README.md`)
 | Metodo | Ruta                     | Descripcion                                                         |
 | ------ | ------------------------ | ------------------------------------------------------------------- |
 | `GET`  | `/api/health`            | Health check                                                        |
-| `GET`  | `/api/animals/lookup`    | Foto de animal (Wikidata Animalia + P18/Commons, Wikipedia de respaldo, gato) |
+| `GET`  | `/api/animals/lookup`    | Foto de animal (Pexels, gato de respaldo vía TheCatAPI)                       |
 | `GET`  | `/api/cats/daily`        | Gato aleatorio + dato (TheCatAPI + CatFact)      |
 | `GET`  | `/api/movies/discover`   | Peliculas TMDB (genre + country)                 |
 | `GET`  | `/api/logs/recent`       | Ultimos logs de peticiones en SQLite             |
@@ -52,9 +52,10 @@ Capturas de pantalla del flujo en **docs/capturas/** (`docs/capturas/README.md`)
 | `PORT`                   | `3001`               | Puerto del servidor                                      |
 | `SQLITE_PATH`            | `server/data/app.db` | Ruta al archivo SQLite                                   |
 | `CAT_API_KEY`            | —                    | Opcional: TheCatAPI; si falla, se usa Cataas como respaldo |
+| `PEXELS_API_KEY`         | —                    | Pexels: busqueda de fotos de animales                    |
 | `TMDB_API_KEY`           | —                    | API key v3 de TMDB para descubrir peliculas              |
 | `TMDB_READ_ACCESS_TOKEN` | —                    | Token JWT de lectura de TMDB (alternativa Bearer)        |
 
-El archivo `.env` esta incluido en el repositorio intencionalmente. Las claves que contiene son de APIs publicas y gratuitas (TheCatAPI, TMDB) creadas exclusivamente para este ejercicio universitario. No representan un riesgo de seguridad real; se dejan commiteadas para que el profesor y los revisores puedan ejecutar el proyecto sin configuracion adicional.
+El archivo `.env` esta incluido en el repositorio intencionalmente. Las claves que contiene son de APIs publicas y gratuitas (TheCatAPI, Pexels, TMDB) creadas exclusivamente para este ejercicio universitario. No representan un riesgo de seguridad real; se dejan commiteadas para que el profesor y los revisores puedan ejecutar el proyecto sin configuracion adicional.
 
 Las peticiones HTTP salientes usan un `User-Agent` con contacto (`miguelqui725@gmail.com`) para APIs publicas (Wikimedia, etc.).

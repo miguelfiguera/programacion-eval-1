@@ -10,8 +10,6 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 export type AnimalLookupViewProps = {
   name: string
   loading: boolean
-  /** Progreso aproximado mientras el backend trabaja (Wikidata → Animalia → imágenes). */
-  loadingPhaseLabel: string | null
   error: string | null
   result: AnimalLookupResultDto | null
   onNameChange: (v: string) => void
@@ -22,11 +20,10 @@ export type AnimalLookupViewProps = {
   onGatoDelDia: () => void
 }
 
-/** Stateless layout for animal-favorito: Wikipedia / TheCatAPI lookup + “Gato del día”. */
+/** Stateless layout for animal-favorito: Pexels photo search + "Gato del día". */
 export function AnimalLookupView({
   name,
   loading,
-  loadingPhaseLabel,
   error,
   result,
   onNameChange,
@@ -42,7 +39,16 @@ export function AnimalLookupView({
         <CardHeader>
           <CardTitle className="text-xl font-mono">animal-favorito</CardTitle>
           <CardDescription>
-            Busca un animal: el backend consulta Wikipedia y, si hace falta,{' '}
+            Busca un animal: el backend consulta{' '}
+            <a
+              className="text-primary underline"
+              href="https://www.pexels.com/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Pexels
+            </a>
+            {' '}y, si no encuentra nada, muestra un gato vía{' '}
             <a
               className="text-primary underline"
               href="https://thecatapi.com/"
@@ -51,7 +57,7 @@ export function AnimalLookupView({
             >
               TheCatAPI
             </a>
-            . “Gato del día” combina imagen (TheCatAPI) y un dato vía{' '}
+            . "Gato del día" combina imagen (TheCatAPI) y un dato vía{' '}
             <a
               className="text-primary underline"
               href="https://catfact.ninja/"
@@ -59,8 +65,8 @@ export function AnimalLookupView({
               rel="noreferrer"
             >
               CatFact.ninja
-            </a>{' '}
-            (gratis, texto en inglés).
+            </a>
+            .
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -106,18 +112,14 @@ export function AnimalLookupView({
 
           {loading && (
             <div
-              className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 py-10 text-muted-foreground"
+              className="flex items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 py-10 text-muted-foreground"
               role="status"
               aria-live="polite"
               aria-busy="true"
             >
-              <Loader2 className="size-9 animate-spin text-primary" aria-hidden />
-              <span className="text-center text-sm font-medium leading-snug text-foreground">
-                {loadingPhaseLabel ?? 'Preparando búsqueda…'}
-              </span>
-              <span className="max-w-xs text-center text-xs text-muted-foreground">
-                El texto de cada paso es aproximado en el tiempo; el servidor solo devuelve un resultado
-                cuando Wikidata confirma Animalia (o el mismo criterio en el respaldo Wikipedia).
+              <Loader2 className="size-6 animate-spin text-primary" aria-hidden />
+              <span className="text-sm font-medium text-foreground">
+                Buscando…
               </span>
             </div>
           )}
@@ -140,18 +142,19 @@ export function AnimalLookupView({
               ) : (
                 <p className="text-sm text-muted-foreground">Sin imagen.</p>
               )}
-              {result.wikipediaUrl && (
-                <p className="text-sm">
+              {result.sourceUrl && (
+                <p className="text-sm text-muted-foreground">
                   <a
-                    href={result.wikipediaUrl}
+                    href={result.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="text-primary underline"
                   >
-                    {result.wikipediaUrl.includes("wikidata.org")
-                      ? "Ver entrada en Wikidata"
-                      : "Ver artículo en Wikipedia"}
+                    Ver en Pexels
                   </a>
+                  {result.photographer && (
+                    <span> — Foto: {result.photographer}</span>
+                  )}
                 </p>
               )}
             </div>
@@ -168,7 +171,7 @@ export function AnimalLookupView({
               {gatoDelDia && (
                 <>
                   <blockquote className="border-l-2 border-primary/40 pl-3 text-sm leading-relaxed text-muted-foreground italic md:text-base">
-                    “{gatoDelDia.quote}”
+                    "{gatoDelDia.quote}"
                   </blockquote>
                   {gatoDelDia.imageUrl ? (
                     <img

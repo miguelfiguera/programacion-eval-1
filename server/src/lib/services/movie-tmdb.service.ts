@@ -5,7 +5,7 @@ import type {
   MovieSummary,
 } from "../../types/movie.types.js";
 import { recordServiceInteraction } from "./request-log.service.js";
-import { HTTP_USER_AGENT } from "../wikimedia-http.js";
+const HTTP_USER_AGENT = "EvalHomework/1.0";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
