@@ -1,3 +1,14 @@
+/**
+ * Express API routes — all mounted under `/api` by the main server.
+ *
+ * Endpoints:
+ *   GET /api/health           → liveness probe
+ *   GET /api/animals/lookup   → animal photo (Pexels + cat fallback)
+ *   GET /api/cats/daily       → random cat image + fun fact
+ *   GET /api/movies/discover  → TMDB discover proxy (genre + country)
+ *   GET /api/logs/recent      → latest SQLite interaction logs
+ */
+
 import { Router, type Request, type Response } from "express";
 
 import { listRecentRequestLogs } from "../db.js";
@@ -11,23 +22,25 @@ import {
 
 const router = Router();
 
-/** @returns True when value is a valid MovieGenreTmdb numeric enum member. */
+/** Checks if a number is a valid MovieGenreTmdb enum member. */
 function isMovieGenreTmdb(value: number): value is MovieGenreTmdb {
   return Object.values(MovieGenreTmdb).includes(value as MovieGenreTmdb);
 }
 
-/** @returns True when value is a valid MovieCountryIso string enum member. */
+/** Checks if a string is a valid MovieCountryIso enum member. */
 function isMovieCountryIso(value: string): value is MovieCountryIso {
   return Object.values(MovieCountryIso).includes(value as MovieCountryIso);
 }
 
+/** Liveness probe — returns `{ ok: true }`. */
 router.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
 /**
- * JSON proxy for animal lookup — Wikipedia (en/es) + Wikidata Animalia check, TheCatAPI fallback.
- * Query: ?name=lion
+ * Animal photo lookup.
+ * Query: `?name=jaguar`
+ * Searches Pexels for a matching photo; returns a cat on miss.
  */
 router.get("/animals/lookup", async (req: Request, res: Response) => {
   const raw = req.query.name;
@@ -50,7 +63,8 @@ router.get("/animals/lookup", async (req: Request, res: Response) => {
 });
 
 /**
- * “Gato del día”: random cat image (TheCatAPI) + cat fact (CatFact.ninja, English).
+ * Cat of the day.
+ * Returns a random cat image (TheCatAPI) + a cat fact (CatFact.ninja).
  */
 router.get("/cats/daily", async (_req: Request, res: Response) => {
   try {
@@ -63,8 +77,9 @@ router.get("/cats/daily", async (_req: Request, res: Response) => {
 });
 
 /**
- * TMDB discover proxy — requires TMDB_API_KEY on the server.
- * Query: ?genre=28&country=US
+ * TMDB movie discover proxy.
+ * Query: `?genre=28&country=US`
+ * Requires `TMDB_API_KEY` or `TMDB_READ_ACCESS_TOKEN` on the server.
  */
 router.get("/movies/discover", async (req: Request, res: Response) => {
   const genreRaw = Number(req.query.genre);
@@ -87,7 +102,9 @@ router.get("/movies/discover", async (req: Request, res: Response) => {
 });
 
 /**
- * Recent SQLite interaction logs (for demos / transparency).
+ * Recent interaction logs from SQLite.
+ * Query: `?limit=50` (default 50, max 200).
+ * Shows what outbound API calls the server has made — useful for demos.
  */
 router.get("/logs/recent", (req: Request, res: Response) => {
   const limitRaw = Number(req.query.limit ?? 50);

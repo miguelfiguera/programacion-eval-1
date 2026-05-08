@@ -1,3 +1,14 @@
+/**
+ * TMDB movie discover service.
+ *
+ * Proxies the TMDB "discover/movie" endpoint so the API key stays
+ * server-side. Also fetches the primary director for each movie via
+ * the /credits endpoint.
+ *
+ * Requires `TMDB_API_KEY` or `TMDB_READ_ACCESS_TOKEN` in the environment.
+ * @see https://developer.themoviedb.org/reference/discover-movie
+ */
+
 import type { MovieCountryIso } from "../../types/movie.enums.js";
 import { MovieGenreTmdb } from "../../types/movie.enums.js";
 import type {
@@ -5,10 +16,11 @@ import type {
   MovieSummary,
 } from "../../types/movie.types.js";
 import { recordServiceInteraction } from "./request-log.service.js";
-const HTTP_USER_AGENT = "EvalHomework/1.0";
 
+const HTTP_USER_AGENT = "EvalHomework/1.0";
 const TMDB_BASE = "https://api.themoviedb.org/3";
 
+/** Raw shape of movies in the TMDB discover response. */
 type TmdbDiscoverJson = {
   results?: Array<{
     id?: number;
@@ -19,10 +31,15 @@ type TmdbDiscoverJson = {
   }>;
 };
 
+/** Raw shape of the TMDB credits response. */
 type TmdbCreditsJson = {
   crew?: Array<{ job?: string; name?: string }>;
 };
 
+/**
+ * Builds auth headers for TMDB. Prefers Bearer token when available,
+ * otherwise returns the v3 api_key for query-param auth.
+ */
 function tmdbAuthHeaders(): {
   headers: Record<string, string>;
   apiKey: string;
@@ -40,6 +57,10 @@ function tmdbAuthHeaders(): {
   return { headers, apiKey, bearer };
 }
 
+/**
+ * Fetches the primary director's name for a single movie from TMDB credits.
+ * Returns null if the request fails or no director is listed.
+ */
 async function fetchMovieDirector(
   movieId: number,
   apiKey: string,
@@ -58,16 +79,15 @@ async function fetchMovieDirector(
     if (!res.ok) return null;
     const data = (await res.json()) as TmdbCreditsJson;
     const d = data.crew?.find((c) => c.job === "Director");
-    const name = d?.name?.trim();
-    return name || null;
+    return d?.name?.trim() || null;
   } catch {
     return null;
   }
 }
 
 /**
- * Builds discover URL. Uses `api_key` in the query only when no Bearer token is configured.
- * TMDB accepts either the v3 `api_key` parameter or `Authorization: Bearer <read_access_token>`.
+ * Builds the TMDB discover URL with genre + country filters.
+ * Uses `api_key` query param only when no Bearer token is configured.
  */
 function discoverUrl(
   genre: MovieGenreTmdb,
@@ -88,8 +108,11 @@ function discoverUrl(
 }
 
 /**
- * Calls TMDB discover and maps results to our lightweight DTOs.
- * Set `TMDB_READ_ACCESS_TOKEN` (Bearer) and/or `TMDB_API_KEY` (query param) in the environment.
+ * Discovers movies from TMDB filtered by genre and country.
+ *
+ * For each movie in the response, also fetches the director's name
+ * in parallel via the /credits endpoint. Returns `{ results: [] }` on
+ * any error (never throws).
  */
 export async function discoverMovies(
   genre: MovieGenreTmdb,
@@ -103,7 +126,7 @@ export async function discoverMovies(
     recordServiceInteraction(
       "MovieTmdbService.discover",
       logPayload,
-      "TMDB_API_KEY or TMDB_READ_ACCESS_TOKEN is not set — cannot call discover API"
+      "TMDB_API_KEY or TMDB_READ_ACCESS_TOKEN is not set"
     );
     return { results: [] };
   }
@@ -114,11 +137,10 @@ export async function discoverMovies(
   try {
     const res = await fetch(url, { headers });
     if (!res.ok) {
-      const msg = `TMDB HTTP ${res.status}`;
       recordServiceInteraction(
         "MovieTmdbService.discover",
         { ...logPayload, outbound: "GET /3/discover/movie" },
-        msg
+        `TMDB HTTP ${res.status}`
       );
       return { results: [] };
     }
@@ -128,6 +150,7 @@ export async function discoverMovies(
 
     const { apiKey: key, bearer: token, headers: h } = tmdbAuthHeaders();
 
+    // Fetch director for each movie in parallel.
     const results: MovieSummary[] = await Promise.all(
       raw.map(async (r) => {
         const id = typeof r.id === "number" && r.id > 0 ? r.id : 0;

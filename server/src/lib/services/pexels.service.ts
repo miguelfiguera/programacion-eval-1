@@ -1,5 +1,8 @@
 /**
- * Pexels image search — free API, requires API key in Authorization header.
+ * Pexels image search service.
+ *
+ * Uses the free Pexels API to find photos by keyword.
+ * Requires `PEXELS_API_KEY` in the environment.
  * @see https://www.pexels.com/api/documentation/
  */
 
@@ -7,6 +10,7 @@ import { recordServiceInteraction } from "./request-log.service.js";
 
 const PEXELS_SEARCH = "https://api.pexels.com/v1/search";
 
+/** Shape of a single photo object in the Pexels API response. */
 export type PexelsPhoto = {
   id: number;
   url: string;
@@ -15,8 +19,12 @@ export type PexelsPhoto = {
 };
 
 /**
- * Searches Pexels for photos matching a query. Returns the first result's
- * large image URL, or null if nothing was found / API key missing.
+ * Searches Pexels for a single photo matching the given query.
+ *
+ * @param query - Search term (e.g. "jaguar", "tiburon").
+ * @returns The first match with its large image URL, Pexels page link and
+ *          photographer credit — or null if nothing was found or the API
+ *          key is missing.
  */
 export async function searchPexelsPhoto(
   query: string,

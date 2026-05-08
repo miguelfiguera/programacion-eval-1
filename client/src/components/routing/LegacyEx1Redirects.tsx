@@ -1,6 +1,10 @@
 import { Navigate, useLocation } from 'react-router-dom'
 
-/** Canonical animal page; keeps `?favorite=` and other query params. */
+/**
+ * Redirects old exercise-1 paths to the canonical `/animal-favorito` route.
+ * Preserves query parameters (e.g. `?favorite=lion`) so bookmarked links
+ * from previous versions still work.
+ */
 export function RedirectToAnimalFavoritoPreserveSearch() {
   const { search } = useLocation()
   return <Navigate to={`/animal-favorito${search}`} replace />

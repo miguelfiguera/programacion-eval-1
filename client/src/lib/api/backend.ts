@@ -1,3 +1,8 @@
+/**
+ * Typed fetch helpers for every Express backend endpoint.
+ * All functions throw on HTTP errors so callers can catch in one place.
+ */
+
 import type {
   AnimalLookupResultDto,
   CatOfDayDto,
@@ -6,32 +11,30 @@ import type {
 } from '@/lib/api/dto'
 
 /**
- * Central catalogue of every HTTP endpoint the Express server exposes under `/api`.
- * Use these paths with `fetch` from hooks only — never call third-party APIs from React.
+ * Central map of backend route paths.
+ * Every fetch helper below references these constants instead of hard-coding URLs.
  */
 export const BackendRoutes = {
   health: '/api/health',
-  /** GET — random cat + cat fact (TheCatAPI + CatFact.ninja) */
   catsDaily: '/api/cats/daily',
-  /** GET ?name= — animal image via Wikipedia + TheCatAPI fallback */
   animalLookup: '/api/animals/lookup',
-  /** GET ?genre=&country= — TMDB discover (server needs TMDB API / Bearer token) */
   movieDiscover: '/api/movies/discover',
-  /** GET ?limit= — recent SQLite service logs */
   logsRecent: '/api/logs/recent',
 } as const
 
 export type BackendRoutesMap = typeof BackendRoutes
 
-/**
- * Typed request helpers — all network failures bubble as thrown Errors with message text.
- */
+/** Checks if the server is alive. Returns `{ ok: true }` on success. */
 export async function fetchHealth(): Promise<{ ok: boolean }> {
   const res = await fetch(BackendRoutes.health)
   if (!res.ok) throw new Error(`health: ${res.status}`)
   return res.json() as Promise<{ ok: boolean }>
 }
 
+/**
+ * Searches for an animal photo via the backend (Pexels → cat fallback).
+ * Throws if the server is unreachable or returns a non-2xx status.
+ */
 export async function fetchAnimalLookup(name: string): Promise<AnimalLookupResultDto> {
   const q = new URLSearchParams({ name })
   const res = await fetch(`${BackendRoutes.animalLookup}?${q}`)
@@ -46,12 +49,17 @@ export async function fetchAnimalLookup(name: string): Promise<AnimalLookupResul
   }
 }
 
+/** Fetches a random cat image + fun fact for the "Cat of the day" feature. */
 export async function fetchCatOfDay(): Promise<CatOfDayDto> {
   const res = await fetch(BackendRoutes.catsDaily)
   if (!res.ok) throw new Error(await readError(res))
   return res.json() as Promise<CatOfDayDto>
 }
 
+/**
+ * Discovers movies from TMDB filtered by genre and country.
+ * The backend proxies the request so the API key stays server-side.
+ */
 export async function fetchMovieDiscover(
   genre: number,
   country: string,
@@ -65,6 +73,7 @@ export async function fetchMovieDiscover(
   return res.json() as Promise<MovieDiscoverResponseDto>
 }
 
+/** Fetches the most recent service interaction logs stored in SQLite. */
 export async function fetchRecentLogs(limit = 50): Promise<RequestLogRowDto[]> {
   const q = new URLSearchParams({ limit: String(limit) })
   const res = await fetch(`${BackendRoutes.logsRecent}?${q}`)
@@ -72,6 +81,10 @@ export async function fetchRecentLogs(limit = 50): Promise<RequestLogRowDto[]> {
   return res.json() as Promise<RequestLogRowDto[]>
 }
 
+/**
+ * Extracts a human-readable error message from a failed response.
+ * Tries to parse `{ error: "..." }` JSON first, falls back to statusText.
+ */
 async function readError(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as { error?: string }

@@ -16,20 +16,39 @@ const MOVIE_SORT_LABELS: Record<MovieSortKey, string> = {
   title: 'Título',
 }
 
+/** Props received from the Exercise2Route in App.tsx. */
 export type Exercise2ViewProps = {
+  /** Genre options for the <select>, derived from the MovieGenreTmdb enum. */
   enumGenreEntries: Array<{ id: number; label: string }>
+  /** Country options for the <select>, derived from the MovieCountryIso enum. */
   enumCountryEntries: Array<{ code: string; label: string }>
+  /** Currently selected genre filter. */
   genre: MovieGenreTmdb
+  /** Currently selected country filter. */
   country: MovieCountryIso
+  /** Updates the genre selection. */
   onGenreChange: (g: MovieGenreTmdb) => void
+  /** Updates the country selection. */
   onCountryChange: (c: MovieCountryIso) => void
+  /** True while the TMDB discover request is in flight. */
   discoverLoading: boolean
+  /** Error message from the last failed discover request, or null. */
   discoverError: string | null
+  /** Discover results (movie list), or null before first search. */
   movies: MovieDiscoverResponseDto | null
+  /** Submits the discover form. */
   onDiscover: (e: FormEvent) => void
 }
 
-/** Shows TypeScript enums + TMDB-powered discover results (no hooks inside). */
+/**
+ * Stateless view for Exercise 2 — movie discovery via TMDB.
+ *
+ * Top card: displays the TypeScript enum values (genre ids + country codes)
+ * so the professor can see how enums map to TMDB parameters.
+ *
+ * Bottom card: genre + country selects, search button, sortable results
+ * with poster, title, release date, director, and overview.
+ */
 export function Exercise2View({
   enumGenreEntries,
   enumCountryEntries,

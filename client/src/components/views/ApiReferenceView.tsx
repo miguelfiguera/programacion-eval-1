@@ -2,15 +2,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import type { DocumentedEndpoint } from '@/lib/api/endpoints.docs'
 import type { RequestLogRowDto } from '@/lib/api/dto'
 
+/** Props received from the ApiDocsRoute in App.tsx. */
 export type ApiReferenceViewProps = {
+  /** Statically typed list of Express endpoints to display. */
   endpoints: DocumentedEndpoint[]
+  /** Most recent interaction log rows from SQLite. */
   logs: RequestLogRowDto[]
+  /** True while the logs are being fetched. */
   logsLoading: boolean
+  /** Error from the last failed log fetch, or null. */
   logsError: string | null
+  /** Manually re-fetches the logs. */
   onLogsReload: () => void
 }
 
-/** Prints typed API catalogue + optional log tail. */
+/**
+ * API reference view — two cards:
+ *   1. Endpoint catalogue: method, path, and description for every route.
+ *   2. Live log tail: scrollable list of recent backend interactions from SQLite.
+ */
 export function ApiReferenceView({
   endpoints,
   logs,

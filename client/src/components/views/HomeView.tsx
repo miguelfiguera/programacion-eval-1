@@ -1,6 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-/** Landing page: exercises live under the top navbar (no demo CRUD). */
+/**
+ * Landing page view.
+ * Shows a welcome card pointing the user to the nav sections:
+ * animal-favorito, movies, and API reference.
+ */
 export function HomeView() {
   return (
     <div className="flex flex-col items-center px-4 py-12">

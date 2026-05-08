@@ -7,20 +7,37 @@ import { Input } from '@/components/ui/input'
 import type { AnimalLookupResultDto, CatOfDayDto } from '@/lib/api/dto'
 import { AlertCircle, Loader2 } from 'lucide-react'
 
+/** Props received from the AnimalFavoritoRoute in App.tsx. */
 export type AnimalLookupViewProps = {
+  /** Current value of the animal name input. */
   name: string
+  /** True while the backend is processing the Pexels search. */
   loading: boolean
+  /** Error message from the last failed request, or null. */
   error: string | null
+  /** Lookup result (Pexels photo or cat fallback), or null before first search. */
   result: AnimalLookupResultDto | null
+  /** Updates the animal name input value. */
   onNameChange: (v: string) => void
+  /** Submits the search form. */
   onSearch: (e: FormEvent) => void
+  /** "Cat of the day" data (image + quote), or null before loading. */
   gatoDelDia: CatOfDayDto | null
+  /** True while the cat-of-the-day request is in progress. */
   gatoDelDiaLoading: boolean
+  /** Error from the cat-of-the-day request, or null. */
   gatoDelDiaError: string | null
+  /** Triggers the "Cat of the day" fetch. */
   onGatoDelDia: () => void
 }
 
-/** Stateless layout for animal-favorito: Pexels photo search + "Gato del día". */
+/**
+ * Stateless view for Exercise 1 (animal-favorito).
+ *
+ * Two features in one card:
+ *   - Animal search: user types a name, backend queries Pexels, shows the photo.
+ *   - Cat of the day: random cat image + fun fact on demand.
+ */
 export function AnimalLookupView({
   name,
   loading,

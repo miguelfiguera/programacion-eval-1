@@ -1,5 +1,14 @@
+/**
+ * Random cat image service — used as fallback when Pexels has no results
+ * and for the "Cat of the day" feature.
+ *
+ * Primary source: TheCatAPI (optional API key via CAT_API_KEY env var).
+ * Backup source:  Cataas (no key needed).
+ */
+
 import { recordServiceInteraction } from "./request-log.service.js";
 
+/** Returns a promise that resolves after `ms` milliseconds. */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -12,6 +21,10 @@ export type CatApiImage = {
   url?: string;
 };
 
+/**
+ * Makes a single attempt to fetch a random cat image from TheCatAPI.
+ * Returns the image URL or null on failure.
+ */
 async function fetchTheCatApiOnce(): Promise<string | null> {
   const payload = { outbound: CAT_IMAGE_ENDPOINT };
   try {
@@ -26,19 +39,14 @@ async function fetchTheCatApiOnce(): Promise<string | null> {
 
     const res = await fetch(CAT_IMAGE_ENDPOINT, { headers });
     if (!res.ok) {
-      const msg = `Cat API HTTP ${res.status}`;
-      recordServiceInteraction("CatApiService.thecatapi", payload, msg);
+      recordServiceInteraction("CatApiService.thecatapi", payload, `Cat API HTTP ${res.status}`);
       return null;
     }
 
     const body = (await res.json()) as CatApiImage[];
     const url = Array.isArray(body) && body[0]?.url ? body[0].url : null;
     if (!url) {
-      recordServiceInteraction(
-        "CatApiService.thecatapi",
-        payload,
-        "Empty cat image list in JSON body"
-      );
+      recordServiceInteraction("CatApiService.thecatapi", payload, "Empty cat image list in JSON body");
       return null;
     }
 
@@ -52,7 +60,8 @@ async function fetchTheCatApiOnce(): Promise<string | null> {
 }
 
 /**
- * Public cat image API without key; used when TheCatAPI fails (rate limits, outages).
+ * Backup: fetches a random cat image from Cataas (no API key required).
+ * Used when TheCatAPI is down or rate-limited.
  * @see https://cataas.com
  */
 async function fetchCataasCatImageUrl(): Promise<string | null> {
@@ -81,8 +90,10 @@ async function fetchCataasCatImageUrl(): Promise<string | null> {
 }
 
 /**
- * Fetches one random cat image URL: TheCatAPI (with optional API key), then Cataas as backup.
- * @returns The image URL string, or null if every source failed.
+ * Fetches one random cat image URL.
+ *
+ * Tries TheCatAPI up to 3 times with progressive delay, then falls back
+ * to Cataas. Returns null only if every source failed.
  */
 export async function fetchRandomCatImageUrl(): Promise<string | null> {
   for (let attempt = 0; attempt < 3; attempt++) {

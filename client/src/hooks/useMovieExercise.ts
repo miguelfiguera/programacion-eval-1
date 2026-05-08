@@ -10,7 +10,11 @@ import {
 } from '@/lib/types/movie.enums'
 
 /**
- * Exercise 2: local enum listings + TMDB discover via backend.
+ * Hook for Exercise 2 — movie discovery via TMDB.
+ *
+ * Manages the selected genre/country filters and calls the backend
+ * discover endpoint. Also exposes the enum entries (id + label) so the
+ * view can render <select> options without importing enums directly.
  */
 export function useMovieExercise() {
   const [genre, setGenre] = useState<MovieGenreTmdb>(MovieGenreTmdb.Action)
@@ -22,6 +26,7 @@ export function useMovieExercise() {
   const [discoverLoading, setDiscoverLoading] = useState(false)
   const [discoverError, setDiscoverError] = useState<string | null>(null)
 
+  /** Calls GET /api/movies/discover with the current genre + country filters. */
   const discover = useCallback(
     async (e?: FormEvent) => {
       e?.preventDefault()
@@ -40,6 +45,7 @@ export function useMovieExercise() {
     [genre, country],
   )
 
+  /** Genre enum entries as `{ id, label }` pairs for <select> rendering. */
   const enumGenreEntries = (
     Object.values(MovieGenreTmdb).filter(
       (v): v is MovieGenreTmdb => typeof v === 'number',
@@ -49,6 +55,7 @@ export function useMovieExercise() {
     label: MOVIE_GENRE_LABELS[id],
   }))
 
+  /** Country enum entries as `{ code, label }` pairs for <select> rendering. */
   const enumCountryEntries = (
     Object.values(MovieCountryIso).filter(
       (v): v is MovieCountryIso => typeof v === 'string',
